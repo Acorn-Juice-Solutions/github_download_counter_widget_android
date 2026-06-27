@@ -7,4 +7,6 @@
     <string name="widget_status_error">Error</string>
     <string name="widget_error">Error</string>
     <string name="widget_no_assets">No asset counts available</string>
+    <string name="widget_settings">Settings</string>
+    <string name="widget_refresh">Refresh</string>
 </resources>

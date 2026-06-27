@@ -3,10 +3,12 @@ package com.example.downloadwidget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import android.widget.RemoteViews
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,6 +19,7 @@ import java.io.IOException
 
 class DownloadWidgetProvider : AppWidgetProvider() {
     companion object {
+        private const val TAG = "DownloadWidget"
         private const val ACTION_REFRESH = "com.example.downloadwidget.ACTION_REFRESH"
         private const val PREFS_NAME = "download_widget_prefs"
         private const val PREF_API_URL = "pref_api_url"
@@ -25,46 +28,72 @@ class DownloadWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        for (widgetId in appWidgetIds) {
-            updateWidgetAsync(context, appWidgetManager, widgetId)
-        }
-    }
-
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        if (ACTION_REFRESH == intent.action) {
-            val manager = AppWidgetManager.getInstance(context)
-            val component = ComponentName(context, DownloadWidgetProvider::class.java)
-            val widgetIds = manager.getAppWidgetIds(component)
-            for (widgetId in widgetIds) {
-                updateWidgetAsync(context, manager, widgetId)
-            }
-        }
-    }
-
-    private fun updateWidgetAsync(context: Context, apm: AppWidgetManager, appWidgetId: Int) {
         val pendingResult = goAsync()
         Thread {
             try {
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val apiUrl = prefs.getString(PREF_API_URL, "https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases") ?: ""
-                val version = prefs.getString(PREF_VERSION, "v1.7.5") ?: ""
-
-                val assets = try {
-                    fetchAssetList(apiUrl, version)
-                } catch (exception: Exception) {
-                    emptyList<AssetInfo>()
+                for (widgetId in appWidgetIds) {
+                    updateWidgetSync(context, appWidgetManager, widgetId)
                 }
-
-                saveAssetList(context, assets)
-                val totalDownloads = assets.sumOf { it.downloadCount }
-                val views = createRemoteViews(context, appWidgetId, version, totalDownloads, assets.isNotEmpty())
-                apm.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_asset_list)
-                apm.updateAppWidget(appWidgetId, views)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }.start()
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (ACTION_REFRESH == intent.action) {
+            val pendingResult = goAsync()
+            val manager = AppWidgetManager.getInstance(context)
+            val component = ComponentName(context, DownloadWidgetProvider::class.java)
+            val widgetIds = manager.getAppWidgetIds(component)
+            Thread {
+                try {
+                    for (widgetId in widgetIds) {
+                        updateWidgetSync(context, manager, widgetId)
+                    }
+                } finally {
+                    pendingResult?.finish()
+                }
+            }.start()
+        } else {
+            super.onReceive(context, intent)
+        }
+    }
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            // Si quieres limpiar preferencias específicas por widgetId podrías hacerlo aquí.
+            // Por ahora, como las preferencias son globales, solo registramos el borrado.
+            Log.d(TAG, "Widgets deleted: ${appWidgetIds.joinToString()}")
+        }.apply()
+    }
+
+    private fun updateWidgetSync(context: Context, apm: AppWidgetManager, appWidgetId: Int) {
+        try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val apiUrl = prefs.getString(PREF_API_URL, "https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases") ?: ""
+            val version = prefs.getString(PREF_VERSION, "v1.7.5") ?: ""
+
+            val assets = try {
+                Log.d(TAG, "Fetching assets from: $apiUrl for version: $version")
+                fetchAssetList(apiUrl, version)
+            } catch (exception: Exception) {
+                Log.e(TAG, "Error fetching assets: ${exception.message}", exception)
+                emptyList<AssetInfo>()
+            }
+
+            saveAssetList(context, assets)
+            val totalDownloads = assets.sumOf { it.downloadCount }
+            val views = createRemoteViews(context, appWidgetId, version, totalDownloads, assets.isNotEmpty())
+            
+            apm.updateAppWidget(appWidgetId, views)
+            apm.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_asset_list)
+            Log.d(TAG, "Widget $appWidgetId updated successfully with $totalDownloads downloads")
+        } catch (e: Exception) {
+            Log.e(TAG, "Fatal error updating widget $appWidgetId", e)
+        }
     }
 
     private fun saveAssetList(context: Context, assets: List<AssetInfo>) {
@@ -84,9 +113,15 @@ class DownloadWidgetProvider : AppWidgetProvider() {
     private fun createRemoteViews(context: Context, appWidgetId: Int, version: String, totalCount: Int, hasAssets: Boolean): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_layout)
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
-        views.setTextViewText(R.id.widget_release_label, context.getString(R.string.widget_version_label, version))
         views.setTextViewText(R.id.widget_count, if (hasAssets) totalCount.toString() else context.getString(R.string.widget_error))
-        views.setTextViewText(R.id.widget_status, if (hasAssets) context.getString(R.string.widget_status_ok) else context.getString(R.string.widget_status_error))
+        
+        if (hasAssets) {
+            views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_ok))
+            views.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_background)
+        } else {
+            views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_error))
+            views.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_error_background)
+        }
 
         val listIntent = Intent(context, AssetListRemoteViewsService::class.java)
         listIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -94,6 +129,12 @@ class DownloadWidgetProvider : AppWidgetProvider() {
         views.setRemoteAdapter(R.id.widget_asset_list, listIntent)
         views.setEmptyView(R.id.widget_asset_list, R.id.widget_empty)
 
+        // Tint icons
+        val iconColor = context.getColor(R.color.secondary_text)
+        views.setInt(R.id.widget_refresh, "setColorFilter", iconColor)
+        views.setInt(R.id.widget_settings, "setColorFilter", iconColor)
+
+        // Settings Button
         val settingsIntent = Intent(context, MainActivity::class.java)
         val settingsPending = PendingIntent.getActivity(
             context,
@@ -101,8 +142,9 @@ class DownloadWidgetProvider : AppWidgetProvider() {
             settingsIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_root, settingsPending)
+        views.setOnClickPendingIntent(R.id.widget_settings, settingsPending)
 
+        // Refresh Button
         val refreshIntent = Intent(context, DownloadWidgetProvider::class.java).apply {
             action = ACTION_REFRESH
         }
@@ -122,6 +164,7 @@ class DownloadWidgetProvider : AppWidgetProvider() {
         val request = Request.Builder()
             .url(apiUrl)
             .header("Accept", "application/vnd.github.v3+json")
+            .header("User-Agent", "DownloadWidgetAndroid-App")
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -142,6 +185,7 @@ class DownloadWidgetProvider : AppWidgetProvider() {
                             asset.optInt("download_count", 0)
                         )
                     }
+                    Log.d(TAG, "Found ${list.size} assets for version $version")
                     return list
                 }
             }

@@ -5,6 +5,7 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/ic_github_download"
         android:label="Download Widget"
         android:supportsRtl="true"
         android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar">

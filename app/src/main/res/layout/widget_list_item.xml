@@ -3,23 +3,33 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="8dp">
+    android:gravity="center_vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
 
     <TextView
         android:id="@+id/widget_asset_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Asset"
-        android:textColor="@color/black"
+        android:text="Asset name"
+        android:textColor="@color/primary_text"
         android:textSize="14sp" />
 
     <TextView
         android:id="@+id/widget_asset_count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
         android:text="0"
-        android:textColor="@color/black"
+        android:textColor="@color/primary_text"
         android:textSize="14sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:background="@drawable/count_badge_background"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:gravity="center"
+        android:minWidth="32dp" />
 </LinearLayout>

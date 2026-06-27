@@ -2,6 +2,7 @@ package com.example.downloadwidget
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import org.json.JSONArray
@@ -9,6 +10,7 @@ import org.json.JSONArray
 
 class AssetListRemoteViewsService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
+        Log.d("AssetListService", "onGetViewFactory called")
         return AssetListRemoteViewsFactory(applicationContext)
     }
 }
@@ -16,13 +18,17 @@ class AssetListRemoteViewsService : RemoteViewsService() {
 class AssetListRemoteViewsFactory(
     private val context: Context
 ) : RemoteViewsService.RemoteViewsFactory {
+    private val TAG = "AssetListFactory"
     private val prefsName = "download_widget_prefs"
     private val prefsKey = "pref_asset_list_json"
     private var assets: List<AssetInfo> = emptyList()
 
-    override fun onCreate() {}
+    override fun onCreate() {
+        Log.d(TAG, "onCreate")
+    }
 
     override fun onDataSetChanged() {
+        Log.d(TAG, "onDataSetChanged")
         loadAssets()
     }
 
@@ -33,6 +39,7 @@ class AssetListRemoteViewsFactory(
     override fun getCount(): Int = assets.size
 
     override fun getViewAt(position: Int): RemoteViews {
+        Log.d(TAG, "getViewAt: $position")
         val asset = assets[position]
         val itemView = RemoteViews(context.packageName, R.layout.widget_list_item)
         itemView.setTextViewText(R.id.widget_asset_name, asset.name)

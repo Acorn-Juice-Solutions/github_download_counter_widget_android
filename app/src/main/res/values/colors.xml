@@ -2,4 +2,11 @@
 <resources>
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
+    <color name="widget_background">#F8F9FA</color>
+    <color name="widget_stroke">#DEE2E6</color>
+    <color name="primary_text">#212529</color>
+    <color name="secondary_text">#6C757D</color>
+    <color name="accent_blue">#007BFF</color>
+    <color name="success_green">#28A745</color>
+    <color name="error_red">#DC3545</color>
 </resources>
