@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import android.view.View
 import android.widget.RemoteViews
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -46,6 +47,15 @@ class DownloadWidgetProvider : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, DownloadWidgetProvider::class.java)
             val widgetIds = manager.getAppWidgetIds(component)
+
+            // Show loading state immediately
+            for (widgetId in widgetIds) {
+                val views = RemoteViews(context.packageName, R.layout.widget_layout)
+                views.setViewVisibility(R.id.widget_refresh, View.GONE)
+                views.setViewVisibility(R.id.widget_progress, View.VISIBLE)
+                manager.partiallyUpdateAppWidget(widgetId, views)
+            }
+
             Thread {
                 try {
                     for (widgetId in widgetIds) {
@@ -62,12 +72,8 @@ class DownloadWidgetProvider : AppWidgetProvider() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            // Si quieres limpiar preferencias específicas por widgetId podrías hacerlo aquí.
-            // Por ahora, como las preferencias son globales, solo registramos el borrado.
-            Log.d(TAG, "Widgets deleted: ${appWidgetIds.joinToString()}")
-        }.apply()
+        Log.d(TAG, "Cleaning up data for widgets: ${appWidgetIds.joinToString()}")
+        // Aquí podrías borrar preferencias específicas si las tuvieras por ID
     }
 
     private fun updateWidgetSync(context: Context, apm: AppWidgetManager, appWidgetId: Int) {
@@ -128,6 +134,10 @@ class DownloadWidgetProvider : AppWidgetProvider() {
         listIntent.data = Uri.parse(listIntent.toUri(Intent.URI_INTENT_SCHEME))
         views.setRemoteAdapter(R.id.widget_asset_list, listIntent)
         views.setEmptyView(R.id.widget_asset_list, R.id.widget_empty)
+
+        // Reset visibility
+        views.setViewVisibility(R.id.widget_refresh, View.VISIBLE)
+        views.setViewVisibility(R.id.widget_progress, View.GONE)
 
         // Tint icons
         val iconColor = context.getColor(R.color.secondary_text)
