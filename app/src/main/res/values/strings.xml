@@ -5,5 +5,6 @@
     <string name="widget_version_label">Version %1$s</string>
     <string name="widget_status_ok">Updated</string>
     <string name="widget_status_error">Error</string>
+    <string name="widget_error">Error</string>
     <string name="widget_no_assets">No asset counts available</string>
 </resources>

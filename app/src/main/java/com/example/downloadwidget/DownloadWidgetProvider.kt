@@ -14,7 +14,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 
-private data class AssetInfo(val name: String, val downloadCount: Int)
 
 class DownloadWidgetProvider : AppWidgetProvider() {
     companion object {

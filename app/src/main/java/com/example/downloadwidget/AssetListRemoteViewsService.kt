@@ -5,9 +5,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import org.json.JSONArray
-import org.json.JSONObject
 
-private data class AssetInfo(val name: String, val downloadCount: Int)
 
 class AssetListRemoteViewsService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
