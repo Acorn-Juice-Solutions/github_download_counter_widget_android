@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <EditTextPreference
+        android:key="pref_api_url"
+        android:title="API URL"
+        android:defaultValue="https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases"
+        android:inputType="textUri"
+        android:useSimpleSummaryProvider="true" />
+
+    <EditTextPreference
+        android:key="pref_version"
+        android:title="Release Version"
+        android:defaultValue="v1.7.5"
+        android:inputType="text"
+        android:useSimpleSummaryProvider="true" />
+</PreferenceScreen>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:background="@drawable/widget_background">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Download Count"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/black" />
+
+    <TextView
+        android:id="@+id/widget_release_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_title"
+        android:layout_marginTop="4dp"
+        android:text="Version v1.7.5"
+        android:textSize="14sp"
+        android:textColor="@color/black" />
+
+    <TextView
+        android:id="@+id/widget_count"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_release_label"
+        android:layout_marginTop="8dp"
+        android:text="0"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="@color/black" />
+
+    <TextView
+        android:id="@+id/widget_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_count"
+        android:layout_marginTop="4dp"
+        android:text="Updated"
+        android:textSize="12sp"
+        android:textColor="@color/black" />
+
+    <ImageView
+        android:id="@+id/widget_refresh"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:src="@android:drawable/ic_popup_sync"
+        android:contentDescription="Refresh" />
+
+    <ListView
+        android:id="@+id/widget_asset_list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_status"
+        android:layout_marginTop="8dp"
+        android:dividerHeight="1dp"
+        android:divider="@android:color/darker_gray" />
+
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_status"
+        android:layout_marginTop="8dp"
+        android:padding="8dp"
+        android:text="No asset counts available"
+        android:textColor="@color/black"
+        android:textSize="14sp"
+        android:visibility="gone" />
+</RelativeLayout>
