@@ -4,7 +4,7 @@
     <EditTextPreference
         android:key="pref_api_url"
         android:title="API URL"
-        android:defaultValue="https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases"
+        android:defaultValue="https://api.github.com/repos/<repo_owner>/<repo_name>/releases"
         android:inputType="textUri"
         app:useSimpleSummaryProvider="true" />
 

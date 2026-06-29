@@ -125,10 +125,10 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
     private fun updateWidgetSync(context: Context, apm: AppWidgetManager, appWidgetId: Int) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val apiUrl = prefs.getString(prefKey(PREF_API_URL, appWidgetId), null)
-            ?: prefs.getString(PREF_API_URL, "https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases")
+            ?: prefs.getString(PREF_API_URL, "https://api.github.com/repos/<repo_owner>/<repo_name>/releases")
             ?: ""
         val version = prefs.getString(prefKey(PREF_VERSION, appWidgetId), null)
-            ?: prefs.getString(PREF_VERSION, "v1.7.5")
+            ?: prefs.getString(PREF_VERSION, "v1.0.0")
             ?: ""
 
         var success = false
