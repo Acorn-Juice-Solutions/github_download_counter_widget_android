@@ -1,5 +1,6 @@
 package com.example.downloadwidget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -11,12 +12,14 @@ import org.json.JSONArray
 class AssetListRemoteViewsService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
         Log.d("AssetListService", "onGetViewFactory called")
-        return AssetListRemoteViewsFactory(applicationContext)
+        val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        return AssetListRemoteViewsFactory(applicationContext, appWidgetId)
     }
 }
 
 class AssetListRemoteViewsFactory(
-    private val context: Context
+    private val context: Context,
+    private val appWidgetId: Int
 ) : RemoteViewsService.RemoteViewsFactory {
     private val TAG = "AssetListFactory"
     private val prefsName = "download_widget_prefs"
@@ -57,7 +60,8 @@ class AssetListRemoteViewsFactory(
 
     private fun loadAssets() {
         val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        val json = prefs.getString(prefsKey, "[]") ?: "[]"
+        val key = "${prefsKey}_$appWidgetId"
+        val json = prefs.getString(key, "[]") ?: "[]"
         val array = JSONArray(json)
         val list = mutableListOf<AssetInfo>()
         for (i in 0 until array.length()) {

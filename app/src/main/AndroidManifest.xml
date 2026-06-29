@@ -21,13 +21,26 @@
 
         <receiver
             android:name=".DownloadWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="Download Count (Full)">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/download_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".DownloadWidgetSmallProvider"
+            android:exported="true"
+            android:label="Download Count (Small)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/download_widget_info_small" />
         </receiver>
 
         <service
