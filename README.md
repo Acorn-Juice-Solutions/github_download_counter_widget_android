@@ -4,9 +4,16 @@ Android home-screen widget that shows download counts for assets from a specific
 
 ## Demo
 
-Image:
+Normal Layout Image:
 
-![Widget demo](docs/demo/widget-demo.png)
+![Widget demo Large](docs/GitHubDowloads_Normal.png)
+
+Small Layout Image:
+
+![Widget demo Large](docs/GitHubDownloadWidget_LayoutSmall.png)
+
+Layout Options:
+![Widget demo Large](docs/GitHubDownloadWidget_Layouts.png)
 
 Video:
 
