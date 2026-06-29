@@ -10,10 +10,11 @@ Normal Layout Image:
 
 Small Layout Image:
 
-![Widget demo Large](docs/GitHubDownloadWidget_LayoutSmall.png)
+![Widget demo Small](docs/GitHubDownloadWidget_LayoutSmall.png)
 
 Layout Options:
-![Widget demo Large](docs/GitHubDownloadWidget_Layouts.png)
+
+![Widget demo Layouts](docs/GitHubDownloadWidget_Layouts.png)
 
 Video:
 
