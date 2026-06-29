@@ -18,7 +18,7 @@ Layout Options:
 
 Video:
 
-[Watch demo video](https://github.com/<your_repo>/releases)
+[Watch demo video](docs/GitHubWidget.mov)
 
 ## What it does
 
