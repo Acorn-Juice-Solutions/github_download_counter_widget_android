@@ -43,19 +43,16 @@ class DownloadWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (ACTION_REFRESH == intent.action) {
-            val pendingResult = goAsync()
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, DownloadWidgetProvider::class.java)
             val widgetIds = manager.getAppWidgetIds(component)
 
-            // Show loading state immediately
+            // Show loading state immediately for all widgets
             for (widgetId in widgetIds) {
-                val views = RemoteViews(context.packageName, R.layout.widget_layout)
-                views.setViewVisibility(R.id.widget_refresh, View.GONE)
-                views.setViewVisibility(R.id.widget_progress, View.VISIBLE)
-                manager.partiallyUpdateAppWidget(widgetId, views)
+                showLoadingState(context, manager, widgetId)
             }
 
+            val pendingResult = goAsync()
             Thread {
                 try {
                     for (widgetId in widgetIds) {
@@ -70,6 +67,62 @@ class DownloadWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    private fun showLoadingState(context: Context, manager: AppWidgetManager, widgetId: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val version = prefs.getString(PREF_VERSION, "v1.7.5") ?: ""
+        val json = prefs.getString(PREF_ASSET_LIST_JSON, "[]") ?: "[]"
+        
+        var currentTotal = 0
+        try {
+            val array = JSONArray(json)
+            for (i in 0 until array.length()) {
+                currentTotal += array.getJSONObject(i).optInt("download_count", 0)
+            }
+        } catch (e: Exception) { /* ignore */ }
+
+        val views = RemoteViews(context.packageName, R.layout.widget_layout)
+        
+        // Setup header and count with existing data
+        views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
+        views.setTextViewText(R.id.widget_release_label, context.getString(R.string.widget_version_label, version))
+        views.setTextViewText(R.id.widget_count, currentTotal.toString())
+        
+        // Show loading state
+        views.setViewVisibility(R.id.widget_refresh, View.GONE)
+        views.setViewVisibility(R.id.widget_progress, View.VISIBLE)
+        views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_in_progress))
+        views.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_in_progress_background)
+        
+        // Re-set the click listeners even for loading state to ensure they work
+        setupButtons(context, widgetId, views)
+
+        manager.updateAppWidget(widgetId, views)
+    }
+
+    private fun setupButtons(context: Context, widgetId: Int, views: RemoteViews) {
+        // Settings Button
+        val settingsIntent = Intent(context, MainActivity::class.java)
+        val settingsPending = PendingIntent.getActivity(
+            context,
+            widgetId,
+            settingsIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_settings, settingsPending)
+
+        // Refresh Button
+        val refreshIntent = Intent(context, DownloadWidgetProvider::class.java).apply {
+            action = ACTION_REFRESH
+        }
+        val refreshPending = PendingIntent.getBroadcast(
+            context,
+            widgetId,
+            refreshIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_refresh, refreshPending)
+    }
+
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         Log.d(TAG, "Cleaning up data for widgets: ${appWidgetIds.joinToString()}")
@@ -77,28 +130,42 @@ class DownloadWidgetProvider : AppWidgetProvider() {
     }
 
     private fun updateWidgetSync(context: Context, apm: AppWidgetManager, appWidgetId: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val apiUrl = prefs.getString(PREF_API_URL, "https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases") ?: ""
+        val version = prefs.getString(PREF_VERSION, "v1.7.5") ?: ""
+
+        var success = false
+        var assets: List<AssetInfo> = emptyList()
+
         try {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val apiUrl = prefs.getString(PREF_API_URL, "https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases") ?: ""
-            val version = prefs.getString(PREF_VERSION, "v1.7.5") ?: ""
+            Log.d(TAG, "Fetching assets from: $apiUrl for version: $version")
+            assets = fetchAssetList(apiUrl, version)
+            success = true
+        } catch (exception: Exception) {
+            Log.e(TAG, "Error fetching assets: ${exception.message}", exception)
+            success = false
+        }
 
-            val assets = try {
-                Log.d(TAG, "Fetching assets from: $apiUrl for version: $version")
-                fetchAssetList(apiUrl, version)
-            } catch (exception: Exception) {
-                Log.e(TAG, "Error fetching assets: ${exception.message}", exception)
-                emptyList<AssetInfo>()
+        try {
+            if (success) {
+                saveAssetList(context, assets)
             }
-
-            saveAssetList(context, assets)
+            
             val totalDownloads = assets.sumOf { it.downloadCount }
-            val views = createRemoteViews(context, appWidgetId, version, totalDownloads, assets.isNotEmpty())
+            val views = createRemoteViews(context, appWidgetId, version, totalDownloads, success)
             
             apm.updateAppWidget(appWidgetId, views)
             apm.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_asset_list)
-            Log.d(TAG, "Widget $appWidgetId updated successfully with $totalDownloads downloads")
+            Log.d(TAG, "Widget $appWidgetId updated. Success: $success, Downloads: $totalDownloads")
         } catch (e: Exception) {
-            Log.e(TAG, "Fatal error updating widget $appWidgetId", e)
+            Log.e(TAG, "Fatal error updating UI for widget $appWidgetId", e)
+            // Emergency stop of animation
+            val errorViews = RemoteViews(context.packageName, R.layout.widget_layout)
+            errorViews.setViewVisibility(R.id.widget_refresh, View.VISIBLE)
+            errorViews.setViewVisibility(R.id.widget_progress, View.GONE)
+            errorViews.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_not_updated))
+            errorViews.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_not_updated_background)
+            apm.partiallyUpdateAppWidget(appWidgetId, errorViews)
         }
     }
 
@@ -116,17 +183,19 @@ class DownloadWidgetProvider : AppWidgetProvider() {
             .apply()
     }
 
-    private fun createRemoteViews(context: Context, appWidgetId: Int, version: String, totalCount: Int, hasAssets: Boolean): RemoteViews {
+    private fun createRemoteViews(context: Context, appWidgetId: Int, version: String, totalCount: Int, updateSuccess: Boolean): RemoteViews {
+        Log.d(TAG, "createRemoteViews for $appWidgetId - Success: $updateSuccess")
         val views = RemoteViews(context.packageName, R.layout.widget_layout)
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
-        views.setTextViewText(R.id.widget_count, if (hasAssets) totalCount.toString() else context.getString(R.string.widget_error))
+        views.setTextViewText(R.id.widget_release_label, context.getString(R.string.widget_version_label, version))
+        views.setTextViewText(R.id.widget_count, totalCount.toString())
         
-        if (hasAssets) {
+        if (updateSuccess) {
             views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_ok))
             views.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_background)
         } else {
-            views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_error))
-            views.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_error_background)
+            views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_not_updated))
+            views.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_not_updated_background)
         }
 
         val listIntent = Intent(context, AssetListRemoteViewsService::class.java)
@@ -135,7 +204,8 @@ class DownloadWidgetProvider : AppWidgetProvider() {
         views.setRemoteAdapter(R.id.widget_asset_list, listIntent)
         views.setEmptyView(R.id.widget_asset_list, R.id.widget_empty)
 
-        // Reset visibility
+        // Reset visibility to show icon and hide progress
+        Log.d(TAG, "Resetting visibility for $appWidgetId: refresh=VISIBLE, progress=GONE")
         views.setViewVisibility(R.id.widget_refresh, View.VISIBLE)
         views.setViewVisibility(R.id.widget_progress, View.GONE)
 
@@ -144,27 +214,8 @@ class DownloadWidgetProvider : AppWidgetProvider() {
         views.setInt(R.id.widget_refresh, "setColorFilter", iconColor)
         views.setInt(R.id.widget_settings, "setColorFilter", iconColor)
 
-        // Settings Button
-        val settingsIntent = Intent(context, MainActivity::class.java)
-        val settingsPending = PendingIntent.getActivity(
-            context,
-            appWidgetId,
-            settingsIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_settings, settingsPending)
-
-        // Refresh Button
-        val refreshIntent = Intent(context, DownloadWidgetProvider::class.java).apply {
-            action = ACTION_REFRESH
-        }
-        val refreshPending = PendingIntent.getBroadcast(
-            context,
-            appWidgetId,
-            refreshIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_refresh, refreshPending)
+        // Re-set the click listeners
+        setupButtons(context, appWidgetId, views)
 
         return views
     }

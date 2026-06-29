@@ -3,8 +3,9 @@
     <string name="app_name">Download Widget</string>
     <string name="widget_title">Download Count</string>
     <string name="widget_version_label">Version %1$s</string>
-    <string name="widget_status_ok">Updated</string>
-    <string name="widget_status_error">Error</string>
+    <string name="widget_status_ok">UPDATED</string>
+    <string name="widget_status_in_progress">IN PROGRESS</string>
+    <string name="widget_status_not_updated">NOT UPDATED</string>
     <string name="widget_error">Error</string>
     <string name="widget_no_assets">No asset counts available</string>
     <string name="widget_settings">Settings</string>
