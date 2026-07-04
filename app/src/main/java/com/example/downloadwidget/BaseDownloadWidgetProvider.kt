@@ -37,7 +37,7 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
 
         private val httpClient: OkHttpClient by lazy {
             OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(45, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
                 .callTimeout(120, TimeUnit.SECONDS)
@@ -47,10 +47,22 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        RefreshWorker.enqueueRefresh(context, providerClass)
+        for (appWidgetId in appWidgetIds) {
+            val assets = loadSavedAssetList(context, appWidgetId)
+            val totalDownloads = assets.sumOf { it.downloadCount }
+            
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val version = prefs.getString(prefKey(PREF_VERSION, appWidgetId), null)
+                ?: prefs.getString(PREF_VERSION, "v1.7.5")
+                ?: ""
+                
+            val views = createRemoteViews(context, appWidgetId, version, totalDownloads, true)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "onReceive: ${intent.action}")
         if (ACTION_REFRESH == intent.action) {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, providerClass)
@@ -74,11 +86,13 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
         val version = prefs.getString(prefKey(PREF_VERSION, widgetId), null)
             ?: prefs.getString(PREF_VERSION, "v1.7.5")
             ?: ""
+        val lastUpdate = prefs.getString(prefKey(PREF_LAST_UPDATE, widgetId), null)
+            ?: prefs.getString(PREF_LAST_UPDATE, "--:--")
 
         val views = RemoteViews(context.packageName, layoutId)
         
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
-        views.setTextViewText(R.id.widget_release_label, context.getString(R.string.widget_version_label, version))
+        views.setTextViewText(R.id.widget_release_label, "${context.getString(R.string.widget_version_label, version)} • $lastUpdate")
         views.setTextViewText(R.id.widget_count, currentTotal.toString())
         
         views.setViewVisibility(R.id.widget_refresh_container, View.GONE)
@@ -94,6 +108,7 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
         val settingsIntent = Intent(context, MainActivity::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = Uri.parse("widget://settings/$widgetId")
         }
         val settingsPending = PendingIntent.getActivity(
             context,
@@ -105,6 +120,8 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
 
         val refreshIntent = Intent(context, providerClass).apply {
             action = ACTION_REFRESH
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+            data = Uri.parse("widget://refresh/$widgetId")
         }
         val refreshPending = PendingIntent.getBroadcast(
             context,
@@ -113,6 +130,8 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.widget_refresh_container, refreshPending)
+        // Also set it on the icon itself just in case the container click is flaky
+        views.setOnClickPendingIntent(R.id.widget_refresh, refreshPending)
     }
 
     fun updateWidgetSyncInternal(context: Context, apm: AppWidgetManager, appWidgetId: Int) {
@@ -128,23 +147,29 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
 
         var success = false
         var assets = loadSavedAssetList(context, appWidgetId)
+        var fatalError: Exception? = null
 
         try {
             Log.d(TAG, "Fetching assets for $appWidgetId from: $apiUrl")
             val newAssets = fetchAssetList(apiUrl, version, token)
-            // Only overwrite if we got some results to avoid 0s on partial response (though JSON should be complete)
             assets = newAssets
             success = true
         } catch (exception: Exception) {
             Log.e(TAG, "Error fetching assets for $appWidgetId: ${exception.message}")
             success = false
+            if (exception.message?.contains("403") == true) {
+                fatalError = exception
+            }
         }
 
         try {
             if (success) {
                 saveAssetList(context, appWidgetId, assets)
                 val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-                prefs.edit().putString(prefKey(PREF_LAST_UPDATE, appWidgetId), time).apply()
+                prefs.edit()
+                    .putString(prefKey(PREF_LAST_UPDATE, appWidgetId), time)
+                    .putString(PREF_LAST_UPDATE, time)
+                    .apply()
             }
             
             val totalDownloads = assets.sumOf { it.downloadCount }
@@ -152,13 +177,19 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
             
             apm.updateAppWidget(appWidgetId, views)
             apm.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_asset_list)
+            
+            // If it was a 403, we throw it so RefreshWorker can handle it
+            fatalError?.let { throw it }
+            
         } catch (e: Exception) {
+            if (e === fatalError) throw e
             Log.e(TAG, "Fatal error updating UI for $appWidgetId", e)
             val errorViews = RemoteViews(context.packageName, layoutId)
             errorViews.setViewVisibility(R.id.widget_refresh_container, View.VISIBLE)
             errorViews.setViewVisibility(R.id.widget_progress, View.GONE)
             errorViews.setTextViewText(R.id.widget_status, context.getString(R.string.widget_status_not_updated))
             errorViews.setInt(R.id.widget_status, "setBackgroundResource", R.drawable.status_not_updated_background)
+            setupButtons(context, appWidgetId, errorViews)
             apm.partiallyUpdateAppWidget(appWidgetId, errorViews)
         }
     }
@@ -171,14 +202,17 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
             item.put("download_count", asset.downloadCount)
             array.put(item)
         }
+        val json = array.toString()
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putString(prefKey(PREF_ASSET_LIST_JSON, appWidgetId), array.toString())
+            .putString(prefKey(PREF_ASSET_LIST_JSON, appWidgetId), json)
+            .putString(PREF_ASSET_LIST_JSON, json) // Also save as global default
             .apply()
     }
 
     private fun loadSavedAssetList(context: Context, appWidgetId: Int): List<AssetInfo> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        // Try widget-specific key, then global key
         val json = prefs.getString(prefKey(PREF_ASSET_LIST_JSON, appWidgetId), null)
             ?: prefs.getString(PREF_ASSET_LIST_JSON, "[]")
             ?: "[]"
@@ -198,7 +232,8 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
     private fun createRemoteViews(context: Context, appWidgetId: Int, version: String, totalCount: Int, updateSuccess: Boolean): RemoteViews {
         val views = RemoteViews(context.packageName, layoutId)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val lastUpdate = prefs.getString(prefKey(PREF_LAST_UPDATE, appWidgetId), "--:--")
+        val lastUpdate = prefs.getString(prefKey(PREF_LAST_UPDATE, appWidgetId), null)
+            ?: prefs.getString(PREF_LAST_UPDATE, "--:--")
 
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
         views.setTextViewText(R.id.widget_release_label, "${context.getString(R.string.widget_version_label, version)} • $lastUpdate")
@@ -234,14 +269,18 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
         val requestBuilder = Request.Builder()
             .url(apiUrl)
             .header("Accept", "application/vnd.github.v3+json")
-            .header("User-Agent", "GitTrack-Android-App")
+            .header("User-Agent", "GitTrack-Android-App-v1")
             
-        if (token.isNotEmpty()) {
+        if (token.isNotBlank()) {
             requestBuilder.header("Authorization", "Bearer $token")
         }
 
         httpClient.newCall(requestBuilder.build()).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("Network error: ${response.code}")
+            if (!response.isSuccessful) {
+                // Better error message for rate limits
+                if (response.code == 403) throw IOException("GitHub Rate Limit (403). Add a token in settings.")
+                throw IOException("Network error: ${response.code}")
+            }
             val body = response.body?.string() ?: throw IOException("Empty response")
             val releases = JSONArray(body)
             for (i in 0 until releases.length()) {
@@ -259,7 +298,7 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
                     return list
                 }
             }
-            throw IOException("Release version not found")
+            throw IOException("Release $version not found in API response")
         }
     }
 

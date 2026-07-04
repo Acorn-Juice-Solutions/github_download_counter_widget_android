@@ -16,14 +16,8 @@ class RefreshWorker(
         private const val TAG = "RefreshWorker"
 
         fun enqueueRefresh(context: Context, providerClass: Class<*>) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-
             val request = OneTimeWorkRequestBuilder<RefreshWorker>()
-                .setConstraints(constraints)
                 .setInputData(workDataOf("provider_class" to providerClass.name))
-                .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
                 .build()
 
             WorkManager.getInstance(context).enqueueUniqueWork(
@@ -36,7 +30,11 @@ class RefreshWorker(
 
     override suspend fun doWork(): Result {
         val providerClassName = inputData.getString("provider_class") ?: return Result.failure()
-        val providerClass = Class.forName(providerClassName)
+        val providerClass = try {
+            Class.forName(providerClassName)
+        } catch (e: Exception) {
+            return Result.failure()
+        }
         
         Log.d(TAG, "Starting background refresh for $providerClassName")
         
@@ -44,19 +42,26 @@ class RefreshWorker(
         val component = ComponentName(context, providerClass)
         val widgetIds = manager.getAppWidgetIds(component)
 
-        val provider = providerClass.getDeclaredConstructor().newInstance() as? BaseDownloadWidgetProvider
-            ?: return Result.failure()
+        if (widgetIds.isEmpty()) return Result.success()
 
-        var allSuccess = true
+        val provider = try {
+            providerClass.getDeclaredConstructor().newInstance() as? BaseDownloadWidgetProvider
+        } catch (e: Exception) {
+            null
+        } ?: return Result.failure()
+
         for (widgetId in widgetIds) {
             try {
                 provider.updateWidgetSyncInternal(context, manager, widgetId)
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating widget $widgetId", e)
-                allSuccess = false
+                if (e.message?.contains("403") == true) {
+                    return Result.failure()
+                }
+                return Result.retry()
             }
         }
 
-        return if (allSuccess) Result.success() else Result.retry()
+        return Result.success()
     }
 }

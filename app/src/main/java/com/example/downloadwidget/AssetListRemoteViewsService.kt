@@ -61,7 +61,10 @@ class AssetListRemoteViewsFactory(
     private fun loadAssets() {
         val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
         val key = "${prefsKey}_$appWidgetId"
-        val json = prefs.getString(key, "[]") ?: "[]"
+        val json = prefs.getString(key, null)
+            ?: prefs.getString(prefsKey, "[]")
+            ?: "[]"
+
         val array = JSONArray(json)
         val list = mutableListOf<AssetInfo>()
         for (i in 0 until array.length()) {

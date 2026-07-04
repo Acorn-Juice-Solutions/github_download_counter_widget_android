@@ -54,11 +54,23 @@ class SettingsFragment : PreferenceFragmentCompat(), SharedPreferences.OnSharedP
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         val appWidgetId = arguments?.getInt(ARG_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
-            
-        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            // Trigger refresh for both providers to be safe, or detect type
-            RefreshWorker.enqueueRefresh(requireContext(), DownloadWidgetProvider::class.java)
-            RefreshWorker.enqueueRefresh(requireContext(), DownloadWidgetSmallProvider::class.java)
+
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID && key != null) {
+            // We trigger a refresh when preferences for this specific widget change.
+            if (key.endsWith("_$appWidgetId")) {
+                val ctx = context ?: return
+                val manager = AppWidgetManager.getInstance(ctx)
+                val info = manager.getAppWidgetInfo(appWidgetId)
+                
+                info?.provider?.className?.let { className ->
+                    try {
+                        val providerClass = Class.forName(className)
+                        RefreshWorker.enqueueRefresh(ctx, providerClass)
+                    } catch (e: Exception) {
+                        android.util.Log.e("SettingsFragment", "Failed to trigger refresh", e)
+                    }
+                }
+            }
         }
     }
 }
