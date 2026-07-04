@@ -15,6 +15,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
     
@@ -28,6 +29,16 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
         protected const val PREF_API_URL = "pref_api_url"
         protected const val PREF_VERSION = "pref_version"
         protected const val PREF_ASSET_LIST_JSON = "pref_asset_list_json"
+
+        private val httpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(45, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .build()
+        }
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -132,7 +143,7 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
             ?: ""
 
         var success = false
-        var assets: List<AssetInfo> = emptyList()
+        var assets = loadSavedAssetList(context, appWidgetId)
 
         try {
             Log.d(TAG, "Fetching assets from: $apiUrl for version: $version")
@@ -177,6 +188,22 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
             .apply()
     }
 
+    private fun loadSavedAssetList(context: Context, appWidgetId: Int): List<AssetInfo> {
+        val json = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(prefKey(PREF_ASSET_LIST_JSON, appWidgetId), "[]")
+            ?: "[]"
+        val array = JSONArray(json)
+        val list = mutableListOf<AssetInfo>()
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i) ?: continue
+            list += AssetInfo(
+                item.optString("name", "asset"),
+                item.optInt("download_count", 0)
+            )
+        }
+        return list
+    }
+
     private fun createRemoteViews(context: Context, appWidgetId: Int, version: String, totalCount: Int, updateSuccess: Boolean): RemoteViews {
         val views = RemoteViews(context.packageName, layoutId)
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
@@ -210,14 +237,13 @@ abstract class BaseDownloadWidgetProvider : AppWidgetProvider() {
     }
 
     private fun fetchAssetList(apiUrl: String, version: String): List<AssetInfo> {
-        val client = OkHttpClient()
         val request = Request.Builder()
             .url(apiUrl)
             .header("Accept", "application/vnd.github.v3+json")
             .header("User-Agent", "DownloadWidgetAndroid-App")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("Network error")
             val body = response.body?.string() ?: throw IOException("Empty response")
             val releases = JSONArray(body)
