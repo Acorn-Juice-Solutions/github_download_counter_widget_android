@@ -1,17 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <EditTextPreference
-        android:key="pref_api_url"
-        android:title="API URL"
-        android:defaultValue="https://api.github.com/repos/<repo_owner>/<repo_name>/releases"
-        android:inputType="textUri"
-        app:useSimpleSummaryProvider="true" />
 
-    <EditTextPreference
-        android:key="pref_version"
-        android:title="Release Version"
-        android:defaultValue="v1.7.5"
-        android:inputType="text"
-        app:useSimpleSummaryProvider="true" />
+    <PreferenceCategory android:title="Source Configuration">
+        <EditTextPreference
+            android:key="pref_api_url"
+            android:title="API URL"
+            android:defaultValue="https://api.github.com/repos/Acorn-Juice-Solutions/accuvideo-releases/releases"
+            android:inputType="textUri"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:key="pref_version"
+            android:title="Release Version"
+            android:defaultValue="v1.7.5"
+            android:inputType="text"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Advanced (Optional)">
+        <EditTextPreference
+            android:key="pref_github_token"
+            android:title="GitHub Personal Access Token"
+            android:summary="Increases rate limits for API calls."
+            android:inputType="textPassword"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

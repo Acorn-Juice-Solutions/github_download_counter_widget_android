@@ -3,7 +3,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="12dp"
+    android:padding="10dp"
     android:background="@drawable/widget_background">
 
     <LinearLayout
@@ -12,35 +12,47 @@
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentTop="true"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
         <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
+            android:id="@+id/widget_refresh_container"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless">
 
             <ImageView
                 android:id="@+id/widget_refresh"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:padding="8dp"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
                 android:src="@android:drawable/stat_notify_sync"
                 android:contentDescription="@string/widget_refresh" />
 
             <ProgressBar
                 android:id="@+id/widget_progress"
                 style="?android:attr/progressBarStyleSmall"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:padding="8dp"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
                 android:visibility="gone"
                 android:indeterminateTint="@color/accent_blue" />
         </FrameLayout>
 
+        <FrameLayout
+            android:layout_width="8dp"
+            android:layout_height="48dp" />
+
         <ImageView
             android:id="@+id/widget_settings"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="8dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="13dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_preferences"
             android:contentDescription="@string/widget_settings" />
     </LinearLayout>
@@ -52,11 +64,12 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:layout_toStartOf="@id/widget_controls"
-        android:layout_marginEnd="8dp">
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="4dp">
 
         <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:src="@drawable/ic_github_download"
             android:layout_marginEnd="8dp"
             android:contentDescription="@null" />
@@ -72,7 +85,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_title"
-                android:textSize="13sp"
+                android:textSize="11sp"
                 android:textAllCaps="true"
                 android:textStyle="bold"
                 android:textColor="@color/secondary_text" />
@@ -81,9 +94,9 @@
                 android:id="@+id/widget_release_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="Version v1.7.5"
-                android:textSize="12sp"
+                android:layout_marginStart="6dp"
+                android:text="v1.7.5 • 12:00"
+                android:textSize="10sp"
                 android:textColor="@color/secondary_text" />
         </LinearLayout>
     </LinearLayout>
@@ -93,7 +106,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/widget_header"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginStart="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -102,7 +116,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0"
-            android:textSize="28sp"
+            android:textSize="26sp"
             android:textStyle="bold"
             android:textColor="@color/accent_blue" />
 
@@ -111,14 +125,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
-            android:text="Updated"
-            android:textSize="10sp"
+            android:text="UPDATED"
+            android:textSize="9sp"
             android:textStyle="bold"
             android:textAllCaps="true"
-            android:paddingLeft="5dp"
-            android:paddingRight="5dp"
-            android:paddingTop="1dp"
-            android:paddingBottom="1dp"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="1dp"
             android:background="@drawable/status_background"
             android:textColor="@color/white" />
     </LinearLayout>
@@ -136,19 +148,20 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/widget_divider"
+        android:layout_alignParentBottom="true"
         android:layout_marginTop="2dp"
         android:divider="@android:color/transparent"
-        android:dividerHeight="2dp" />
+        android:dividerHeight="1dp" />
 
     <TextView
         android:id="@+id/widget_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/widget_divider"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="10dp"
         android:gravity="center"
         android:text="@string/widget_no_assets"
         android:textColor="@color/secondary_text"
-        android:textSize="13sp"
+        android:textSize="12sp"
         android:visibility="gone" />
 </RelativeLayout>
