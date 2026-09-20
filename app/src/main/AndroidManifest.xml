@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -54,5 +55,23 @@
             android:name=".ui.widget.AssetListRemoteViewsService"
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!--
+            DownloadWidgetApp implements androidx.work.Configuration.Provider for on-demand
+            WorkManager initialization. The lint rule RemoveWorkManagerInitializer requires us to
+            strip the default WorkManagerInitializer that androidx.work merges into
+            androidx.startup.InitializationProvider. Using tools:node="merge" on the provider (not
+            "remove") preserves any other startup initializers pulled in by dependencies.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>

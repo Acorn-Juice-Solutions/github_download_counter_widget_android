@@ -10,9 +10,14 @@ release, per widget instance. Auto-refreshes hourly, respects the GitHub rate li
 ETag/conditional requests, and stores the optional Personal Access Token in
 `EncryptedSharedPreferences`.
 
-Built as a portfolio piece: layered architecture, ~100% test-covered data layer, CI with
-lint + Detekt + Kover, signed release workflow, Material 3 + Dynamic Colors, English +
-Spanish.
+Built as a portfolio piece: layered architecture, unit-tested data layer, CI with
+Spotless (ktlint) + Detekt + JUnit + Robolectric, signed release workflow, Material 3 +
+Dynamic Colors, English + Spanish.
+
+> Verified on Pixel Launcher / Android 15+. Other AppWidgetHost implementations may
+> coalesce or drop consecutive `updateAppWidget` calls differently — see the
+> [`docs/architecture.md`](docs/architecture.md#tap-refresh-path-101) tap-refresh
+> section for the workaround that this app deploys and the rationale behind it.
 
 ## Screenshots
 
@@ -33,7 +38,7 @@ Demo video: [`docs/GitHubWidget.mov`](docs/GitHubWidget.mov)
   `androidx.security-crypto` (AES-256-GCM values, AES-256-SIV keys).
 - Auto-refresh every 60 min via `PeriodicWorkRequest` with `NetworkType.CONNECTED` +
   exponential backoff. Manual refresh from the widget too.
-- Explicit `NOT SET UP`, `SYNCING`, `RATE LIMIT`, `TAG NOT FOUND`, `NOT UPDATED`,
+- Explicit `NOT SET UP`, `UPDATING`, `RATE LIMIT`, `TAG NOT FOUND`, `NOT UPDATED`,
   `UPDATED` states — no silent failure modes.
 - Localized in English and Spanish.
 
@@ -105,12 +110,13 @@ RefreshScheduler ── enqueues ──▶ RefreshWorker (CoroutineWorker)
 
 ```bash
 ./gradlew testDebugUnitTest           # JVM + Robolectric unit tests
-./gradlew koverHtmlReport             # Coverage HTML at app/build/reports/kover/
 ./gradlew connectedAndroidTest        # Instrumented (requires emulator/device)
 ```
 
-Coverage floor enforced in `app/build.gradle.kts`: **70% overall**, **85% in
-`data.repo` + `data.remote`**. The CI job posts a coverage comment on every PR.
+99 unit tests covering the data + domain + rendering layers. Coverage enforcement via
+Kover is checked in but currently disabled — Kover 0.9 does not yet auto-detect the
+AGP 9 debug variant, so its report is consistently empty. Will be re-enabled when
+Kover ships AGP 9 support.
 
 ## Contributing
 

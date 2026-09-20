@@ -20,8 +20,8 @@ android {
         applicationId = "com.acornjuice.downloadwidget"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,6 +37,15 @@ android {
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: findProperty("KEYSTORE_PASSWORD") as String?
                 keyAlias = System.getenv("KEY_ALIAS") ?: findProperty("KEY_ALIAS") as String?
                 keyPassword = System.getenv("KEY_PASSWORD") ?: findProperty("KEY_PASSWORD") as String?
+
+                // AGP 9 defaults leave v3/v4 off. Explicitly opt in so portfolio releases carry
+                // a modern signature set: v2 (baseline for Android 7+), v3 (key rotation) and
+                // v4 (incremental install idsig). v1 stays off — minSdk 26 never runs on
+                // devices that require the JAR-signing scheme.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
             }
         }
     }

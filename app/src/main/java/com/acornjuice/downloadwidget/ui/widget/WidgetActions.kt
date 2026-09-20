@@ -21,8 +21,8 @@ object WidgetActions {
     /**
      * Internal broadcast fired by [com.acornjuice.downloadwidget.ui.widget.BaseDownloadWidgetProvider]
      * after a tap-refresh has finished the network call: signals the provider to apply the
-     * terminal render via `partiallyUpdateAppWidget` (a different launcher code path than
-     * `updateAppWidget`, less prone to the dedup that swallows the follow-up).
+     * terminal render from a fresh `onReceive`, so the follow-up `updateAppWidget` lands
+     * comfortably past the launcher's dedup window (see class kdoc).
      */
     const val ACTION_APPLY_FOLLOWUP = "com.acornjuice.downloadwidget.ACTION_APPLY_FOLLOWUP"
 

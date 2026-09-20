@@ -90,8 +90,33 @@ flowchart LR
 - `SharedPreferences.edit { … }` is synchronous. WorkManager guarantees sequential
   execution per unique work name, so per-widget preference writes don't race with each
   other.
-- `RemoteViews` updates go through `AppWidgetManager.updateAppWidget` on the WorkManager
-  dispatcher, which is safe by contract.
+- `RemoteViews` updates from the periodic worker go through `AppWidgetManager.updateAppWidget`
+  on the WorkManager dispatcher, which is safe by contract.
+
+### Tap-refresh path (1.0.1+)
+
+The refresh button on the widget does **not** route through `RefreshWorker`. Empirically,
+`updateAppWidget` calls issued from a WorkManager worker context are silently coalesced
+or dropped by some launcher implementations (observed on stock Pixel launchers on
+Android 15+). The tap path instead runs entirely from receiver contexts:
+
+1. `BaseDownloadWidgetProvider.onReceive` handles `ACTION_REFRESH` synchronously on the
+   receiver's main thread and emits `updateAppWidget(Loading)` immediately, so the
+   spinner + yellow "UPDATING" badge appear right away.
+2. `goAsync()` keeps the process alive; a coroutine on `Dispatchers.IO` runs
+   `ReleaseRepository.refresh(widgetId)` off the main thread.
+3. After the HTTP call plus a defensive `POST_LOADING_DELAY` to age past the launcher's
+   dedup window, the coroutine broadcasts a custom `ACTION_APPLY_FOLLOWUP` intent.
+4. `onReceive` handles the follow-up in a **fresh** receiver invocation and emits the
+   terminal state via `partiallyUpdateAppWidget` — a different launcher code path that
+   is not subject to the same coalescing. Widget flips to green "UPDATED".
+
+`SettingsFragment.triggerRefresh` fires `ACTION_REFRESH` for every affected widget so
+config-change refreshes take the same reliable path.
+
+The periodic 60-min refresh continues to use `RefreshWorker` — its cache write still
+lands even if the widget repaint is dropped, and the next `onUpdate` (or the next
+user tap) paints the fresh data.
 
 ## Security posture
 

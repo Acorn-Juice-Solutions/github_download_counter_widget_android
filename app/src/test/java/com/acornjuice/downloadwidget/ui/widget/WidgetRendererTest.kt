@@ -3,7 +3,6 @@ package com.acornjuice.downloadwidget.ui.widget
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
@@ -44,9 +43,6 @@ class WidgetRendererTest {
     private fun visibilityOf(root: View, viewId: Int): Int =
         root.findViewById<View>(viewId).visibility
 
-    private fun refreshIconAlpha(root: View): Int =
-        root.findViewById<ImageView>(R.id.widget_refresh).imageAlpha
-
     @Test
     fun `renders Success with total downloads and updated status`() {
         val release = Release(
@@ -60,12 +56,13 @@ class WidgetRendererTest {
         assertThat(textOf(root, R.id.widget_count)).isEqualTo("42")
         assertThat(textOf(root, R.id.widget_status))
             .isEqualTo(context.getString(R.string.widget_status_ok))
-        // Refresh icon at full opacity when idle.
-        assertThat(refreshIconAlpha(root)).isEqualTo(255)
+        // Idle: refresh icon visible, spinner hidden.
+        assertThat(visibilityOf(root, R.id.widget_refresh)).isEqualTo(View.VISIBLE)
+        assertThat(visibilityOf(root, R.id.widget_progress)).isEqualTo(View.GONE)
     }
 
     @Test
-    fun `renders Loading uses cached total and dims refresh icon`() {
+    fun `renders Loading uses cached total and shows spinner`() {
         val cached = Release("v1.0.0", listOf(Asset("a.apk", 12)), fetchedAtEpochSeconds = 1_000L)
 
         val root = render(WidgetState.Loading(cached = cached))
@@ -73,9 +70,9 @@ class WidgetRendererTest {
         assertThat(textOf(root, R.id.widget_count)).isEqualTo("12")
         assertThat(textOf(root, R.id.widget_status))
             .isEqualTo(context.getString(R.string.widget_status_in_progress))
-        // Refresh icon remains visible and tappable but dimmed while syncing.
-        assertThat(visibilityOf(root, R.id.widget_refresh)).isEqualTo(View.VISIBLE)
-        assertThat(refreshIconAlpha(root)).isLessThan(255)
+        // While syncing: spinner visible, refresh icon hidden.
+        assertThat(visibilityOf(root, R.id.widget_progress)).isEqualTo(View.VISIBLE)
+        assertThat(visibilityOf(root, R.id.widget_refresh)).isEqualTo(View.GONE)
     }
 
     @Test

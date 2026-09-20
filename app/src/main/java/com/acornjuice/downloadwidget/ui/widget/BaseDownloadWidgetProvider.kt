@@ -33,11 +33,10 @@ import kotlin.time.Duration.Companion.seconds
  * ### Tap-refresh flow
  *
  * On this app's target launchers, two `updateAppWidget` calls to the same widget within
- * ~1 s get coalesced — the "Loading" render lands, the follow-up "Success" render is
- * silently dropped, and the spinner never stops. To sidestep that we (a) split the two
- * updates across **separate receiver invocations**, (b) space them by ≥ 2 s in total,
- * and (c) use `partiallyUpdateAppWidget` for the terminal update (different launcher
- * code path than `updateAppWidget`, less prone to the same dedup):
+ * ~1 s get coalesced — the "Loading" render lands, the follow-up terminal render is
+ * silently dropped and the spinner never stops. To sidestep that we split the two
+ * updates across **separate receiver invocations** and space them by ≥ 2 s in total,
+ * comfortably outside the launcher's dedup window:
  *
  * 1. Immediately in the tap's `onReceive`: synchronous `updateAppWidget(Loading)` →
  *    spinner appears + badge turns yellow "UPDATING".
@@ -45,9 +44,13 @@ import kotlin.time.Duration.Companion.seconds
  *    thread, then waits [POST_LOADING_DELAY] to age past the launcher's dedup window
  *    before firing an explicit-target `ACTION_APPLY_FOLLOWUP` broadcast.
  * 3. That broadcast triggers a **fresh** `onReceive` → [handleFollowupApply], which reads
- *    the freshly populated cache and emits the terminal render via
- *    `partiallyUpdateAppWidget`. The launcher treats it as a distinct partial update
- *    (not a coalesced duplicate) and repaints — spinner hides, badge turns green.
+ *    the freshly populated cache and emits the terminal render via `updateAppWidget`.
+ *    A prior iteration used `partiallyUpdateAppWidget` here, hoping it would slip past
+ *    the dedup — but on some launchers the merged-partial update failed to repaint
+ *    text/visibility setters (the ListView still refreshed via
+ *    `notifyAppWidgetViewDataChanged`, masking the bug as "assets update but count and
+ *    spinner don't"). Once the [POST_LOADING_DELAY] is comfortably past the ~1 s dedup
+ *    window, plain `updateAppWidget` is the reliable choice.
  *
  * Subclasses only supply their [WidgetKind]; both layout resolution and provider
  * `ComponentName` are derived from it.
@@ -143,12 +146,10 @@ abstract class BaseDownloadWidgetProvider(val kind: WidgetKind) : AppWidgetProvi
 
     /**
      * Second-stage of a tap refresh: the network call is already done (cache is fresh),
-     * we just render the terminal state. Uses `partiallyUpdateAppWidget` — a different
-     * launcher code path than `updateAppWidget` — because the launcher's dedup window
-     * that swallows follow-up `updateAppWidget` calls seems to be scoped to `updateAppWidget`
-     * only. Partial updates merge on top of the cached RemoteViews, so all the changed
-     * fields (spinner visibility, refresh icon visibility, status text/background, count,
-     * header timestamp) still apply.
+     * we just render the terminal state. Uses `updateAppWidget` (via [renderWidget]):
+     * by the time we get here we are already [POST_LOADING_DELAY] past the initial
+     * `Loading` render, comfortably outside the ~1 s launcher dedup window that this
+     * flow was designed to skirt around.
      */
     private fun handleFollowupApply(context: Context, intent: Intent) {
         val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
@@ -165,16 +166,7 @@ abstract class BaseDownloadWidgetProvider(val kind: WidgetKind) : AppWidgetProvi
             else WidgetState.Error(WidgetState.ErrorKind.NETWORK, cached = null)
         }
         SafeLogger.i(TAG, "Followup apply widget=$widgetId state=${state::class.simpleName}")
-        val views = WidgetRenderer.render(
-            context = context,
-            layoutId = kind.layoutRes,
-            widgetId = widgetId,
-            state = state,
-            providerClass = kind.providerClass,
-        )
-        val manager = AppWidgetManager.getInstance(context)
-        manager.partiallyUpdateAppWidget(intArrayOf(widgetId), views)
-        manager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_asset_list)
+        renderWidget(context, AppWidgetManager.getInstance(context), widgetId, state)
     }
 
     private fun computeState(
