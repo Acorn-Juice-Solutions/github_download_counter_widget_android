@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.acornjuice.downloadwidget.domain.model.Asset
 import com.acornjuice.downloadwidget.domain.model.Release
+import com.acornjuice.downloadwidget.util.SafeLogger
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -20,6 +21,7 @@ import org.json.JSONObject
 class AssetCacheStore(private val prefs: SharedPreferences) {
 
     private companion object {
+        const val TAG = "AssetCacheStore"
         const val KEY_ASSET_TAG = "pref_asset_tag"
         const val JSON_NAME = "name"
         const val JSON_DOWNLOAD_COUNT = "download_count"
@@ -35,6 +37,7 @@ class AssetCacheStore(private val prefs: SharedPreferences) {
             parseAssets(json)
         } catch (jsonEx: JSONException) {
             // Corrupted cache — treat as absent. A subsequent refresh will overwrite it.
+            SafeLogger.w(TAG, "Corrupted asset cache widget=$widgetId, treating as absent", jsonEx)
             return null
         }
         return Release(tag = tag, assets = assets, fetchedAtEpochSeconds = fetchedAt)

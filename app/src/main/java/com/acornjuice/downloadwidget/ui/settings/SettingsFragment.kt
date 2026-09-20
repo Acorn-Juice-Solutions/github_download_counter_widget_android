@@ -162,11 +162,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
         private const val ARG_APPWIDGET_ID = "arg_appwidget_id"
         private const val TAG = "SettingsFragment"
 
-        fun newInstance(appWidgetId: Int): SettingsFragment {
-            return SettingsFragment().apply {
-                arguments = Bundle().apply {
-                    putInt(ARG_APPWIDGET_ID, appWidgetId)
-                }
+        fun newInstance(appWidgetId: Int): SettingsFragment = SettingsFragment().apply {
+            arguments = Bundle().apply {
+                putInt(ARG_APPWIDGET_ID, appWidgetId)
             }
         }
     }

@@ -108,7 +108,7 @@ abstract class BaseDownloadWidgetProvider(val kind: WidgetKind) : AppWidgetProvi
                         SafeLogger.i(TAG, "Inline refresh widget=$widgetId result=${result::class.simpleName}")
                     }
                 } catch (timeout: TimeoutCancellationException) {
-                    SafeLogger.w(TAG, "Inline refresh widget=$widgetId timed out after $REFRESH_TIMEOUT")
+                    SafeLogger.w(TAG, "Inline refresh widget=$widgetId timed out after $REFRESH_TIMEOUT", timeout)
                     networkFailed = true
                 }
                 delay(POST_LOADING_DELAY)
@@ -162,8 +162,11 @@ abstract class BaseDownloadWidgetProvider(val kind: WidgetKind) : AppWidgetProvi
             // Cache is already fresh from handleRefreshRequest's network call — read it
             // rather than making another API round-trip.
             val cached = container.releaseRepository.cachedRelease(widgetId)
-            if (cached != null) WidgetState.Success(cached)
-            else WidgetState.Error(WidgetState.ErrorKind.NETWORK, cached = null)
+            if (cached != null) {
+                WidgetState.Success(cached)
+            } else {
+                WidgetState.Error(WidgetState.ErrorKind.NETWORK, cached = null)
+            }
         }
         SafeLogger.i(TAG, "Followup apply widget=$widgetId state=${state::class.simpleName}")
         renderWidget(context, AppWidgetManager.getInstance(context), widgetId, state)
@@ -191,7 +194,7 @@ abstract class BaseDownloadWidgetProvider(val kind: WidgetKind) : AppWidgetProvi
             }
         }
     } catch (timeout: TimeoutCancellationException) {
-        SafeLogger.w(TAG, "onUpdate refresh widget=$widgetId timed out")
+        SafeLogger.w(TAG, "onUpdate refresh widget=$widgetId timed out", timeout)
         WidgetState.Error(
             kind = WidgetState.ErrorKind.NETWORK,
             cached = repository.cachedRelease(widgetId),

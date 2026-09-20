@@ -141,6 +141,10 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 }
 
 spotless {
+    // Force LF regardless of platform. Default is PLATFORM_NATIVE which on Windows means
+    // CRLF, causing every line of every file to be flagged locally even though the files
+    // on disk (and in git) are pure LF, matching .editorconfig `end_of_line = lf`.
+    lineEndings = com.diffplug.spotless.LineEnding.UNIX
     kotlin {
         target("src/**/*.kt")
         targetExclude("**/build/**", "**/generated/**")
