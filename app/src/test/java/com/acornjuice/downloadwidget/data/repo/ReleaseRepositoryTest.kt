@@ -9,8 +9,8 @@ import com.acornjuice.downloadwidget.data.local.WidgetConfigStore
 import com.acornjuice.downloadwidget.data.remote.ApiResponse
 import com.acornjuice.downloadwidget.data.remote.FakeGitHubApi
 import com.acornjuice.downloadwidget.domain.model.Asset
-import com.acornjuice.downloadwidget.domain.model.Release
 import com.acornjuice.downloadwidget.domain.model.RefreshResult
+import com.acornjuice.downloadwidget.domain.model.Release
 import com.acornjuice.downloadwidget.domain.time.TimeProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
