@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +15,7 @@ import androidx.preference.PreferenceFragmentCompat
 import com.acornjuice.downloadwidget.R
 import com.acornjuice.downloadwidget.appContainer
 import com.acornjuice.downloadwidget.data.local.PrefKeys
+import com.acornjuice.downloadwidget.ui.widget.WidgetActions
 import com.acornjuice.downloadwidget.ui.widget.WidgetKind
 import com.acornjuice.downloadwidget.util.SafeLogger
 
@@ -98,22 +100,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     /**
-     * Fires an ACTION_APPWIDGET_UPDATE broadcast so the widget re-runs `onUpdate` and
-     * picks up the new preference.
+     * Kicks each affected widget through its refresh-tap pipeline so the network fetch
+     * *and* the visual repaint happen. We reuse [WidgetActions.ACTION_REFRESH]
+     * deliberately: firing plain `ACTION_APPWIDGET_UPDATE` routes to `onUpdate` which
+     * uses `updateAppWidget` — silently dropped by this app's target launchers. The
+     * tap-refresh flow ends in `partiallyUpdateAppWidget` (different launcher code
+     * path), which actually repaints the widget.
      *
      * Two paths:
-     * - Opened from a specific widget's settings icon → only that widget's `appWidgetId`
-     *   receives the broadcast (its scoped key was the one that changed).
-     * - Opened from the app launcher (no `EXTRA_APPWIDGET_ID`) → broadcast to every
-     *   widget of every [WidgetKind]. The unscoped keys just changed and every widget's
-     *   [WidgetConfigStore.get] falls back to them, so all should refresh.
+     * - Opened from a specific widget's settings icon → only that widget refreshes.
+     * - Opened from the app launcher (no `EXTRA_APPWIDGET_ID`) → refresh every widget
+     *   instance of every [WidgetKind] so the just-changed unscoped keys take effect
+     *   for all of them.
      *
      * Posted to the next main-thread turn so the preference framework has time to
      * persist the new value (the change listener fires *before* persistence).
-     *
-     * Uses `sendBroadcast` instead of WorkManager because on this app's target
-     * launchers, `updateAppWidget` calls coming from a WorkManager worker are silently
-     * dropped, while those from a legitimate `onReceive` are respected.
      */
     private fun triggerRefresh() {
         val ctx = context?.applicationContext ?: return
@@ -138,11 +139,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         Handler(Looper.getMainLooper()).post {
             for ((providerClass, ids) in targets) {
-                val intent = Intent(ctx, providerClass).apply {
-                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                for (widgetId in ids) {
+                    val intent = Intent(ctx, providerClass).apply {
+                        action = WidgetActions.ACTION_REFRESH
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                        // Uniquify so back-to-back setting changes do not collide in
+                        // Android's pending-broadcast dedup.
+                        data = Uri.Builder()
+                            .scheme("widget-settings-refresh")
+                            .authority("refresh")
+                            .appendPath(widgetId.toString())
+                            .appendPath(System.currentTimeMillis().toString())
+                            .build()
+                    }
+                    ctx.sendBroadcast(intent)
                 }
-                ctx.sendBroadcast(intent)
             }
         }
     }
