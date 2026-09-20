@@ -1,0 +1,40 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - gradle
+    commit-message:
+      prefix: "deps"
+      include: scope
+    groups:
+      androidx:
+        patterns:
+          - "androidx.*"
+      kotlinx:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+      test-libs:
+        patterns:
+          - "junit:junit"
+          - "com.google.truth:*"
+          - "org.robolectric:*"
+          - "com.squareup.okhttp3:mockwebserver"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "ci"
+      include: scope

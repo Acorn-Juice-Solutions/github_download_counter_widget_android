@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Application chrome -->
+    <string name="app_name">Widget de descargas</string>
+    <string name="widget_full_label">Contador de descargas</string>
+    <string name="widget_small_label">Contador de descargas (compacto)</string>
+
+    <!-- Widget UI -->
+    <string name="widget_title">Contador de descargas</string>
+    <string name="widget_version_label">Versión %1$s</string>
+    <string name="widget_release_label_placeholder">— · —</string>
+    <string name="widget_release_label_format">%1$s · %2$s</string>
+    <string name="widget_last_update_never">—</string>
+
+    <!-- Widget status pill -->
+    <string name="widget_status_ok">ACTUALIZADO</string>
+    <string name="widget_status_in_progress">ACTUALIZANDO</string>
+    <string name="widget_status_not_updated">SIN ACTUALIZAR</string>
+    <string name="widget_status_rate_limit">LÍMITE ALCANZADO</string>
+    <string name="widget_status_not_found">TAG NO ENCONTRADO</string>
+    <string name="widget_status_unconfigured">SIN CONFIGURAR</string>
+
+    <!-- Empty and error surfaces -->
+    <string name="widget_error">Error</string>
+    <string name="widget_no_assets">No hay recuentos de descarga disponibles</string>
+    <string name="widget_unconfigured_hint">Pulsa el icono de ajustes para configurar este widget.</string>
+
+    <!-- Accessibility -->
+    <string name="widget_settings">Ajustes</string>
+    <string name="widget_refresh">Actualizar</string>
+
+    <!-- Tap-time toast confirmations -->
+    <string name="widget_refresh_toast_updated">Widget actualizado</string>
+    <string name="widget_refresh_toast_error">No se pudo actualizar</string>
+
+    <!-- Settings screen -->
+    <string name="settings_category_source">Configuración del origen</string>
+    <string name="settings_category_advanced">Avanzado (opcional)</string>
+    <string name="settings_api_url_title">URL de la API</string>
+    <string name="settings_api_url_hint">https://api.github.com/repos/owner/repo/releases</string>
+    <string name="settings_tag_title">Tag de la release</string>
+    <string name="settings_tag_hint">v1.0.0</string>
+    <string name="settings_token_title">Personal Access Token de GitHub</string>
+    <string name="settings_token_summary">Sube el límite de la API de 60 a 5000 peticiones/hora. Se guarda cifrado solo en este dispositivo.</string>
+</resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!-- Belt-and-suspenders with android:allowBackup="false".
+         Applies to Android 12+ (targetSdk 34). -->
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <exclude domain="sharedpref" path="download_widget_prefs.xml" />
+        <exclude domain="sharedpref" path="download_widget_secure_prefs.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="download_widget_prefs.xml" />
+        <exclude domain="sharedpref" path="download_widget_secure_prefs.xml" />
+    </device-transfer>
+</data-extraction-rules>

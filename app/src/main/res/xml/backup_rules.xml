@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android 12 (android:fullBackupContent). Redundant with allowBackup="false"
+     but kept as explicit defense against future manifest edits. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="download_widget_prefs.xml" />
+    <exclude domain="sharedpref" path="download_widget_secure_prefs.xml" />
+</full-backup-content>

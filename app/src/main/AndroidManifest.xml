@@ -1,17 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.downloadwidget">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:allowBackup="true"
+        android:name=".DownloadWidgetApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/ic_github_download"
-        android:label="Download Widget"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar">
+        android:theme="@style/Theme.DownloadWidget"
+        android:usesCleartextTraffic="false">
 
         <activity
-            android:name="com.example.downloadwidget.MainActivity"
+            android:name=".ui.settings.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -20,12 +26,12 @@
         </activity>
 
         <receiver
-            android:name=".DownloadWidgetProvider"
+            android:name=".ui.widget.DownloadWidgetProvider"
             android:exported="true"
-            android:label="Download Count (Full)">
+            android:label="@string/widget_full_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.downloadwidget.ACTION_REFRESH" />
+                <action android:name="com.acornjuice.downloadwidget.ACTION_REFRESH" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -33,12 +39,12 @@
         </receiver>
 
         <receiver
-            android:name=".DownloadWidgetSmallProvider"
+            android:name=".ui.widget.DownloadWidgetSmallProvider"
             android:exported="true"
-            android:label="Download Count (Small)">
+            android:label="@string/widget_small_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.downloadwidget.ACTION_REFRESH" />
+                <action android:name="com.acornjuice.downloadwidget.ACTION_REFRESH" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -46,8 +52,26 @@
         </receiver>
 
         <service
-            android:name=".AssetListRemoteViewsService"
+            android:name=".ui.widget.AssetListRemoteViewsService"
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!--
+            DownloadWidgetApp implements androidx.work.Configuration.Provider for on-demand
+            WorkManager initialization. The lint rule RemoveWorkManagerInitializer requires us to
+            strip the default WorkManagerInitializer that androidx.work merges into
+            androidx.startup.InitializationProvider. Using tools:node="merge" on the provider (not
+            "remove") preserves any other startup initializers pulled in by dependencies.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>
