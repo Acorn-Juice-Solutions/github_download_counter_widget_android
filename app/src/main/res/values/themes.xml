@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Application-wide Material 3 theme.
+         DynamicColors.applyToActivitiesIfAvailable() upgrades this to system-derived
+         wallpaper colors on Android 12+ (no-op on older). -->
+    <style name="Theme.DownloadWidget" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+    </style>
+
+    <!-- Preference screen tweaks so the classic PreferenceFragmentCompat looks at home
+         inside a Material 3 activity. -->
+    <style name="Theme.DownloadWidget.Settings" parent="Theme.DownloadWidget">
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+    </style>
+</resources>

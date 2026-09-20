@@ -21,7 +21,7 @@
             android:layout_width="18dp"
             android:layout_height="18dp"
             android:layout_gravity="center"
-            android:src="@android:drawable/stat_notify_sync"
+            android:src="@drawable/ic_refresh"
             android:contentDescription="@string/widget_refresh"
             android:alpha="0.5" />
 

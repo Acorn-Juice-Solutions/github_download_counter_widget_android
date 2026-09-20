@@ -1,0 +1,84 @@
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+processors:
+  active: true
+
+console-reports:
+  active: true
+  exclude:
+    - 'ProjectStatisticsReport'
+    - 'ComplexityReport'
+    - 'NotificationReport'
+    - 'FindingsReport'
+    - 'FileBasedFindingsReport'
+
+output-reports:
+  active: true
+
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    threshold: 60
+  LongParameterList:
+    active: true
+    functionThreshold: 6
+    constructorThreshold: 7
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 15
+    thresholdInClasses: 15
+    thresholdInInterfaces: 10
+    thresholdInObjects: 15
+    thresholdInEnums: 15
+
+naming:
+  active: true
+  PackageNaming:
+    active: true
+    packagePattern: '[a-z]+(\.[a-z][a-zA-Z0-9]*)*'
+  ClassNaming:
+    active: true
+  FunctionNaming:
+    active: true
+  VariableNaming:
+    active: true
+
+style:
+  active: true
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+  WildcardImport:
+    active: true
+    excludes: ['**/test/**', '**/androidTest/**']
+  UnnecessaryAbstractClass:
+    active: false
+  ReturnCount:
+    active: true
+    max: 4
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: false
+
+potential-bugs:
+  active: true
+
+empty-blocks:
+  active: true
+
+performance:
+  active: true
+
+coroutines:
+  active: true
