@@ -150,6 +150,10 @@ spotless {
                     "ktlint_standard_no-wildcard-imports" to "enabled",
                     "ktlint_standard_max-line-length" to "enabled",
                     "max_line_length" to "140",
+                    // Preserve intentional multi-line signatures with trailing commas.
+                    // Default ktlint behavior collapses any signature that fits under
+                    // max_line_length, which conflicts with the codebase's readability style.
+                    "ktlint_standard_function-signature" to "disabled",
                 ),
             )
     }
