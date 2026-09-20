@@ -26,7 +26,7 @@ androidx-test-ext-junit = "1.2.1"
 
 # Tooling plugins
 detekt = "1.23.7"
-spotless = "7.0.0"
+spotless = "8.10.2"
 ktlint = "1.4.1"
 kover = "0.9.1"
 
