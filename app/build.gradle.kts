@@ -154,6 +154,7 @@ spotless {
                     // Default ktlint behavior collapses any signature that fits under
                     // max_line_length, which conflicts with the codebase's readability style.
                     "ktlint_standard_function-signature" to "disabled",
+                    "ktlint_standard_class-signature" to "disabled",
                 ),
             )
     }

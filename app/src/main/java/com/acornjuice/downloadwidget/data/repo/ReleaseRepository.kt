@@ -6,8 +6,8 @@ import com.acornjuice.downloadwidget.data.local.SecureTokenStore
 import com.acornjuice.downloadwidget.data.local.WidgetConfigStore
 import com.acornjuice.downloadwidget.data.remote.ApiResponse
 import com.acornjuice.downloadwidget.data.remote.GitHubApi
-import com.acornjuice.downloadwidget.domain.model.Release
 import com.acornjuice.downloadwidget.domain.model.RefreshResult
+import com.acornjuice.downloadwidget.domain.model.Release
 import com.acornjuice.downloadwidget.domain.time.TimeProvider
 import java.io.IOException
 

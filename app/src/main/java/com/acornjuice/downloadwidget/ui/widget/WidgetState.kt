@@ -1,7 +1,7 @@
 package com.acornjuice.downloadwidget.ui.widget
 
-import com.acornjuice.downloadwidget.domain.model.Release
 import com.acornjuice.downloadwidget.domain.model.RefreshResult
+import com.acornjuice.downloadwidget.domain.model.Release
 
 /**
  * What the widget UI should currently show.
