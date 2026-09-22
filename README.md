@@ -1,6 +1,7 @@
 # Download Widget
 
-[![CI](https://github.com/Neonexus29/github_download_counter_widget_android/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Neonexus29/github_download_counter_widget_android/actions/workflows/ci.yml)
+[![CI](https://github.com/Acorn-Juice-Solutions/github_download_counter_widget_android/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Acorn-Juice-Solutions/github_download_counter_widget_android/actions/workflows/ci.yml)
+[![Supply chain](https://github.com/Acorn-Juice-Solutions/github_download_counter_widget_android/actions/workflows/supply-chain.yml/badge.svg?branch=main)](https://github.com/Acorn-Juice-Solutions/github_download_counter_widget_android/actions/workflows/supply-chain.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![minSdk](https://img.shields.io/badge/minSdk-26-3DDC84?logo=android&logoColor=white)](https://developer.android.com/tools/releases/platforms)
@@ -10,9 +11,11 @@ release, per widget instance. Auto-refreshes hourly, respects the GitHub rate li
 ETag/conditional requests, and stores the optional Personal Access Token in
 `EncryptedSharedPreferences`.
 
-Built as a portfolio piece: layered architecture, unit-tested data layer, CI with
-Spotless (ktlint) + Detekt + JUnit + Robolectric, signed release workflow, Material 3 +
-Dynamic Colors, English + Spanish.
+Listed on [acornjuice.com](https://www.acornjuice.com/products/github-counter/) as
+**GitHub Download Counter**. A small utility, maintained to the same standard as
+everything else we ship: layered architecture, unit-tested data layer, CI with Spotless
+(ktlint) + Detekt + JUnit + Robolectric, supply-chain checks on every push, signed
+release workflow, Material 3 + Dynamic Colors, English + Spanish.
 
 > Verified on Pixel Launcher / Android 15+. Other AppWidgetHost implementations may
 > coalesce or drop consecutive `updateAppWidget` calls differently — see the
@@ -48,14 +51,14 @@ Requires JDK 17 + Android SDK 34.
 
 ```bash
 # Clone
-git clone https://github.com/Neonexus29/github_download_counter_widget_android.git
+git clone https://github.com/Acorn-Juice-Solutions/github_download_counter_widget_android.git
 cd github_download_counter_widget_android
 
 # Build a debug APK (or open in Android Studio Ladybug+)
 ./gradlew assembleDebug
 
-# Run the full quality gate locally
-./gradlew spotlessCheck detekt testDebugUnitTest koverVerify
+# Run the same quality gate CI runs
+./gradlew spotlessCheck detekt testDebugUnitTest assembleDebug
 ```
 
 On Windows the wrapper is `gradlew.bat`.
@@ -115,8 +118,26 @@ RefreshScheduler ── enqueues ──▶ RefreshWorker (CoroutineWorker)
 
 99 unit tests covering the data + domain + rendering layers. Coverage enforcement via
 Kover is checked in but currently disabled — Kover 0.9 does not yet auto-detect the
-AGP 9 debug variant, so its report is consistently empty. Will be re-enabled when
-Kover ships AGP 9 support.
+AGP 9 debug variant, so its report is consistently empty. `koverVerify` is therefore
+not part of the quality gate above, and CI does not run it. Both will be re-enabled
+when Kover ships AGP 9 support.
+
+## Supply chain
+
+`supply-chain.yml` runs on every push to `main`, on every pull request, daily at
+06:31 UTC and on demand:
+
+- **SBOM** in CycloneDX format (`download-widget.cdx.json`), generated with
+  `anchore/sbom-action` from `app/gradle.lockfile` — so it reflects the resolved
+  dependency tree, not just what the build files declare.
+- **Vulnerability scan** with `osv-scanner` (`osv.json`).
+- **Lockfile verification**: the lock has to match the declared dependencies.
+- **Secret scanning across the full history**, not only the latest commit.
+- **Workflow audit**, with every GitHub Action pinned to a commit SHA instead of a
+  moving tag — a rewritten tag is how supply-chain worms reach a build.
+- **Dependency graph** submitted to GitHub.
+
+Scan reports are kept as build artifacts for 90 days.
 
 ## Contributing
 
@@ -125,7 +146,8 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 ## Security
 
 Report vulnerabilities via the process in [`SECURITY.md`](SECURITY.md). Do not open a
-public issue for security matters.
+public issue for security matters. The SBOM and the scan reports described above are
+attached to every run of the supply-chain workflow.
 
 ## License
 
