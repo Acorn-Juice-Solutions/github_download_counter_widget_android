@@ -1,4 +1,17 @@
 version: 2
+
+# Cooldown windows are the point of the additions below.
+#
+# Malicious releases are published from stolen maintainer tokens, so they are
+# correctly signed and pass every signature check. What catches them is time:
+# they get spotted and yanked within hours to days. Declining to adopt anything
+# younger than a week sidesteps most of that class without waiting for anyone
+# to catalogue the compromise. Security updates bypass cooldown by design.
+#
+# Note these PRs will fail CI until app/gradle.lockfile is regenerated, because
+# Dependabot does not understand Gradle lockfiles. relock.yml handles that
+# automatically for PRs labelled `dependencies`.
+
 updates:
   - package-ecosystem: gradle
     directory: "/"
@@ -6,6 +19,11 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 7
     labels:
       - dependencies
       - gradle
@@ -32,6 +50,9 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      # No parseable semver for Dependabot here, so only default-days applies.
+      default-days: 7
     labels:
       - dependencies
       - github-actions
