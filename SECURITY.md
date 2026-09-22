@@ -11,7 +11,7 @@ Include:
 - What you observed and what you expected.
 - Whether you consider the finding remotely exploitable.
 
-Acknowledgement within **72 hours**. A first assessment (accepted / clarifying questions /
+Acknowledgement within **24 hours**. A first assessment (accepted / clarifying questions /
 declined) within **7 days**. Patch timeline depends on severity — coordinated disclosure
 before the patch is available is welcome.
 
