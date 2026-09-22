@@ -170,3 +170,64 @@ spotless {
 }
 
 // Coverage reporting deliberately disabled here — see the plugins block for the reason.
+
+// ---------------------------------------------------------------------------
+// Dependency locking
+//
+// The version catalog pins our *direct* dependencies. It says nothing about
+// what those resolve to transitively, which is most of the tree and most of the
+// risk. Without a lockfile, two builds of the same commit can ship different
+// code, and an SBOM generated from the catalog describes something the build
+// never actually produced.
+//
+// STRICT is the mode that matters: the default (LockMode.DEFAULT) will happily
+// resolve a configuration that has no lock state, which quietly defeats the
+// point. STRICT fails instead.
+//
+// lockAllConfigurations() is deliberately not used. AGP creates a large number
+// of non-resolvable and internal configurations, and trying to lock them all
+// produces either errors or a pile of lockfiles nobody reads. These four are
+// the ones that determine what ends up in the APK.
+//
+// Regenerate after any dependency change:
+//     ./gradlew resolveAndLockAll --write-locks
+// and commit app/gradle.lockfile in the SAME commit as the version bump —
+// landing one without the other breaks every build immediately.
+// ---------------------------------------------------------------------------
+val lockedConfigurations =
+    setOf(
+        "releaseRuntimeClasspath",
+        "releaseCompileClasspath",
+        "debugRuntimeClasspath",
+        "debugCompileClasspath",
+    )
+
+dependencyLocking {
+    lockMode.set(LockMode.STRICT)
+}
+
+configurations.matching { it.name in lockedConfigurations }.configureEach {
+    resolutionStrategy.activateDependencyLocking()
+}
+
+// Resolves the locked configurations without compiling anything, so locks can
+// be refreshed without running a full build.
+//
+// Note this resolves only the locked configurations, not every resolvable one.
+// The snippet in the Gradle docs does the latter, which breaks under AGP:
+// internal configurations such as debugApiElements expose several variants that
+// fail attribute matching, and the task dies on ambiguity before reaching
+// anything useful. Nothing else needs resolving here anyway.
+tasks.register("resolveAndLockAll") {
+    notCompatibleWithConfigurationCache("Writes lock state during configuration")
+    doFirst {
+        require(gradle.startParameter.isWriteDependencyLocks) {
+            "Run with --write-locks, otherwise this task does nothing useful."
+        }
+    }
+    doLast {
+        configurations
+            .filter { it.isCanBeResolved && it.name in lockedConfigurations }
+            .forEach { it.resolve() }
+    }
+}

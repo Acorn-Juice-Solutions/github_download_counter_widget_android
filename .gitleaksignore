@@ -1,0 +1,19 @@
+# Accepted findings, pinned to an exact file, rule and line.
+#
+# A fingerprint stops matching as soon as the line moves, which is deliberate:
+# it forces a fresh look rather than handing out a standing exemption. Do not
+# replace these with a regex allowlist — a pattern broad enough to cover a fake
+# token is broad enough to hide a real one.
+#
+# ---------------------------------------------------------------------------
+# SafeLoggerTest.kt — fixture, not a credential.
+#
+# The literal is `ghp_abc123def456XYZ_890`, invented to assert that
+# SafeLogger.redact() strips `token=` values from log output. Redacting tokens
+# is the feature; a test for it necessarily contains something token-shaped.
+#
+# Both the working-tree and commit-scoped fingerprints are listed, because CI
+# scans full history while a local `gitleaks dir` does not.
+# ---------------------------------------------------------------------------
+app/src/test/java/com/acornjuice/downloadwidget/util/SafeLoggerTest.kt:generic-api-key:32
+d1cbfe76c5f696ae861f01015162d7ee65c25249:app/src/test/java/com/acornjuice/downloadwidget/util/SafeLoggerTest.kt:generic-api-key:32

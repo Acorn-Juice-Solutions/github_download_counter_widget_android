@@ -1,0 +1,81 @@
+name: Relock Gradle dependencies
+
+# Dependabot does not understand Gradle lockfiles. It bumps libs.versions.toml,
+# and every one of its PRs then fails CI because app/gradle.lockfile still
+# pins the old resolution under LockMode.STRICT.
+#
+# Without this workflow, dependency locking becomes an unpaid weekly chore and
+# gets ripped out within a month. With it, Dependabot's PR self-heals: the lock
+# is regenerated and pushed onto the PR branch.
+#
+# Known limitation: pushes made with GITHUB_TOKEN do not trigger a new CI run,
+# so the PR's checks stay stale until someone hits "re-run" or pushes again.
+# The fix is a PAT stored as a secret, which is a deliberate trade-off we have
+# not made — a token with write access, usable by any workflow in the repo, is
+# a bigger supply-chain surface than a manual re-run button.
+
+on:
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "gradle/libs.versions.toml"
+      - "app/build.gradle.kts"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+
+permissions:
+  contents: read
+
+jobs:
+  relock:
+    # Only Dependabot's own PRs. A human changing dependencies is expected to
+    # regenerate the lock themselves, and seeing it in their diff is the point.
+    #
+    # Checks the PR author rather than github.actor: the actor context reflects
+    # whoever triggered the run and can be influenced, while the pull_request
+    # payload's author cannot. This job has contents: write, so the distinction
+    # is not academic.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    name: Regenerate lockfile
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          # Needed to push back to the PR branch, so this is the one job in the
+          # repo that deliberately keeps the checkout credential.
+          persist-credentials: true
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+
+      # Resolution only — this does not compile the PR's code.
+      - name: Regenerate locks
+        run: ./gradlew resolveAndLockAll --write-locks --no-configuration-cache
+
+      - name: Commit if the lock changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- '*.lockfile'; then
+            echo "Lockfile already up to date." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '*.lockfile'
+          git commit -m "deps: regenerate Gradle lockfile"
+          git push
+          {
+            echo "### Lockfile regenerated"
+            echo ""
+            echo "Pushed onto the PR branch. CI checks will not re-run by themselves —"
+            echo "use \"Re-run all jobs\" before merging."
+          } >> "$GITHUB_STEP_SUMMARY"
