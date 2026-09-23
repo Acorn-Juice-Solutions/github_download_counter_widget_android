@@ -4,11 +4,11 @@ agp = "9.2.1"
 kotlin = "2.1.0"
 
 # AndroidX runtime
-androidx-core-ktx = "1.13.1"
-androidx-appcompat = "1.7.0"
+androidx-core-ktx = "1.19.0"
+androidx-appcompat = "1.8.0"
 androidx-preference = "1.2.1"
 androidx-work = "2.9.1"
-androidx-security-crypto = "1.1.0-alpha06"
+androidx-security-crypto = "1.1.0"
 material = "1.12.0"
 
 # Third-party runtime
@@ -20,9 +20,9 @@ junit = "4.13.2"
 json = "20240303"
 truth = "1.4.4"
 robolectric = "4.13"
-androidx-test-core = "1.6.1"
-androidx-test-runner = "1.6.2"
-androidx-test-ext-junit = "1.2.1"
+androidx-test-core = "1.7.0"
+androidx-test-runner = "1.7.0"
+androidx-test-ext-junit = "1.3.0"
 
 # Tooling plugins
 detekt = "1.23.7"
