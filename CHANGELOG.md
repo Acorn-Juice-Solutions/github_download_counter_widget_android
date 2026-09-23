@@ -60,6 +60,15 @@ real timeout, an honest status badge and a safety net it never had.
 - `gradle.properties`, absent until now, so the daemon no longer runs on Gradle's default
   384 MB of metaspace: `:app:lintVitalAnalyzeRelease` was dying with
   `OutOfMemoryError: Metaspace` on every `assembleRelease`.
+- Every tagged release now carries its own CycloneDX SBOM as a release asset, plus a
+  build-provenance attestation and an SBOM attestation signed through Sigstore. The SBOM
+  is generated from the tagged tree in a job of its own, so third-party code never shares
+  a runner with the signing keystore, and the attestations bind both the build and the
+  inventory to the APK's digest.
+- The release job refuses to continue when the tag does not match `versionName`. Three
+  releases (1.0.5, 2.0.0, 2.0.1) shipped APKs that declared themselves 1.0.1 because
+  nothing checked.
+- Release APKs are published as `download-widget-vX.Y.Z.apk` instead of `app-release.apk`.
 
 ### Changed
 
@@ -78,6 +87,63 @@ real timeout, an honest status badge and a safety net it never had.
 
 - `WidgetActions.ACTION_APPLY_FOLLOWUP` and the delayed self-rebroadcast it drove.
 - `widget_refresh_toast_updated` / `widget_refresh_toast_error` strings.
+
+## [2.0.1] – 2026-09-22
+
+Build pipeline only. No application code changed, so the APK is byte-for-byte equivalent
+to 2.0.0 and `versionCode` stays at `2` — this is not an in-place upgrade for devices.
+
+### Fixed
+
+- `ci.yml` used `branches: ['*']` on both `push` and `pull_request`. GitHub's glob `*`
+  does not match `/`, so every branch with a prefix (`fix/...`, `feat/...`, `chore/...`)
+  pushed without ever triggering CI — only `main` and other slashless branches ran.
+  Restored to `'**'`, matching the other three workflows.
+
+### Changed
+
+- Debug APK assembly is now manual-only. `ci.yml` gained a `workflow_dispatch` trigger,
+  and the `assemble` job carries `if: github.event_name == 'workflow_dispatch'`, so
+  push and PR runs stop at the verify job instead of building an artifact nobody
+  downloads.
+- All pinned actions upgraded to their latest release across all four workflows, each
+  SHA resolved through the GitHub API and re-verified against its tag:
+  `actions/checkout` v4.4.0 → v7.0.1, `actions/setup-java` v4.9.1 → v6.0.1,
+  `gradle/actions/setup-gradle` and `gradle/actions/dependency-submission` v3.5.0 →
+  v6.3.0, `actions/upload-artifact` v4.6.2 → v7.0.1, `anchore/sbom-action` v0.24.0 →
+  v0.24.2, `softprops/action-gh-release` v2.6.2 → v3.0.3.
+
+## [2.0.0] – 2026-09-22
+
+Supply-chain release. Adds dependency locking, SBOM generation, and vulnerability,
+secret and workflow scanning on top of the 1.0.x rewrite. No application code or user
+visible behavior changed.
+
+### Added
+
+- `supply-chain.yml`: five jobs covering lockfile integrity, CycloneDX SBOM generation
+  (`anchore/sbom-action`) with an osv-scanner dependency scan, GitHub dependency graph
+  submission, gitleaks secret scanning over full history, and a zizmor workflow audit.
+  Runs on push, PR, a daily cron, and manual dispatch.
+- Gradle dependency locking under `LockMode.STRICT` (`app/gradle.lockfile`,
+  `settings-gradle.lockfile`). Before this, the version catalog pinned 18 direct
+  dependencies while 88 resolved artifacts went unrecorded — an SBOM would have
+  described a build that never happened.
+- `relock.yml`: regenerates the lockfile on Dependabot PRs and pushes it back to the PR
+  branch, since Dependabot does not understand Gradle lockfiles and every one of its PRs
+  would otherwise fail CI on a stale lock.
+- `.gitleaksignore` for known-safe historical matches.
+- Expanded `SECURITY.md` (disclosure process, threat model, supply-chain posture) and
+  README documentation.
+
+### Security
+
+- osv-scanner blocks the build on any package carrying a `MAL-` advisory; other
+  vulnerabilities are reported to the job summary without failing.
+- Release signing job disables the Gradle cache, so a branch-writable cache cannot seed
+  the job that decodes the keystore.
+- Both scanner binaries (osv-scanner, gitleaks) are pinned by version and verified by
+  SHA256 before execution.
 
 ## [1.0.1] – 2026-09-20
 
