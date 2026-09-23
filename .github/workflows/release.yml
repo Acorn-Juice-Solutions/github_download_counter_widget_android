@@ -101,6 +101,7 @@ jobs:
       # The file name inside the artifact comes from sbom-action, not from us.
       # Resolve it once rather than hardcoding a name we do not control.
       - name: Locate the SBOM
+        id: locate-sbom
         run: |
           set -euo pipefail
           file=$(find sbom -type f -name '*.cdx.json' -print -quit)
@@ -108,7 +109,7 @@ jobs:
             echo "::error::No .cdx.json inside the downloaded SBOM artifact."
             exit 1
           fi
-          echo "SBOM_PATH=$file" >> "$GITHUB_ENV"
+          echo "path=$file" >> "$GITHUB_OUTPUT"
 
       - name: Decode keystore
         env:
@@ -171,7 +172,7 @@ jobs:
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-path: app/build/outputs/apk/release/*.apk
-          sbom-path: ${{ env.SBOM_PATH }}
+          sbom-path: ${{ steps.locate-sbom.outputs.path }}
 
       # Handing the APK to the publish job through an artifact is what lets the
       # two stay apart: the publisher gets the signed binary without ever being
