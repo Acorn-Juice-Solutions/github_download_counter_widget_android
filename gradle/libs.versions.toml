@@ -1,7 +1,7 @@
 [versions]
 # Android / Kotlin toolchain
 agp = "9.2.1"
-kotlin = "2.1.0"
+kotlin = "2.4.20"
 
 # AndroidX runtime
 androidx-core-ktx = "1.13.1"
@@ -13,7 +13,7 @@ material = "1.12.0"
 
 # Third-party runtime
 okhttp = "4.12.0"
-coroutines = "1.9.0"
+coroutines = "1.11.0"
 
 # Test
 junit = "4.13.2"
@@ -28,7 +28,7 @@ androidx-test-ext-junit = "1.2.1"
 detekt = "1.23.7"
 spotless = "8.10.0"
 ktlint = "1.4.1"
-kover = "0.9.1"
+kover = "0.9.9"
 
 [libraries]
 # Runtime
