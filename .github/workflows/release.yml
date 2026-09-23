@@ -5,13 +5,62 @@ on:
     tags:
       - "v*"
 
+# Read-only by default, as in ci.yml: the SBOM job has no business writing to
+# the repository, and a job added later cannot silently inherit write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  sbom:
+    name: CycloneDX SBOM
+    runs-on: ubuntu-latest
+    # Deliberately a separate job from the signed build. sbom-action is
+    # third-party code, and the publishing job holds the decoded release
+    # keystore — keeping them apart means nothing third-party ever shares a
+    # workspace, a runner or a secret scope with the signing key.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Same generation path as supply-chain.yml, but against the tagged tree:
+      # an SBOM attached to a release has to describe that release, not
+      # whatever main happened to be when the nightly scan last ran.
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: download-widget-${{ github.ref_name }}.cdx.json
+          output-file: download-widget-${{ github.ref_name }}.cdx.json
+
+      # syft emits an almost-empty document when it fails to read
+      # app/gradle.lockfile. Attaching that is worse than attaching nothing: it
+      # reads as a complete inventory of an app with nine dependencies.
+      - name: Sanity-check the SBOM
+        run: |
+          set -euo pipefail
+          file="download-widget-${GITHUB_REF_NAME}.cdx.json"
+          count=$(jq '[.components[]?] | length' "$file")
+          if [ "$count" -lt 10 ]; then
+            echo "::error::Only $count components — syft probably did not read the lockfile."
+            exit 1
+          fi
+          echo "### SBOM" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$count\` components catalogued for \`${GITHUB_REF_NAME}\`." >> "$GITHUB_STEP_SUMMARY"
+
   build-and-publish:
     name: Assemble signed release + upload to GitHub Release
     runs-on: ubuntu-latest
+    # Fail closed: no SBOM, no release. A tag that cannot produce an inventory
+    # is a tag whose contents we cannot describe.
+    needs: sbom
+    permissions:
+      contents: write
+      # attest-build-provenance signs through Sigstore using this job's OIDC
+      # identity and writes the attestation to the repository's store.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,6 +85,26 @@ jobs:
           # once per tag.
           cache-disabled: true
 
+      # Before the keystore exists on disk, and in its own directory so the
+      # release glob below cannot pick up anything else the job wrote.
+      - name: Download the SBOM
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: download-widget-${{ github.ref_name }}.cdx.json
+          path: sbom
+
+      # The file name inside the artifact comes from sbom-action, not from us.
+      # Resolve it once rather than hardcoding a name we do not control.
+      - name: Locate the SBOM
+        run: |
+          set -euo pipefail
+          file=$(find sbom -type f -name '*.cdx.json' | head -n 1)
+          if [ -z "$file" ]; then
+            echo "::error::No .cdx.json inside the downloaded SBOM artifact."
+            exit 1
+          fi
+          echo "SBOM_PATH=$file" >> "$GITHUB_ENV"
+
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -54,6 +123,24 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
+      # Both of these are actions/ — the same trust level as the checkout and
+      # upload steps this job already runs. That is why they belong here and
+      # the third-party generator stays out in its own job: provenance has to
+      # be signed by the run that actually produced the binary.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: app/build/outputs/apk/release/*.apk
+
+      # The attached .cdx.json states what is inside the APK; this is what makes
+      # that statement checkable. The attestation binds the SBOM to the APK's
+      # digest, so a swapped binary or an edited inventory stops verifying.
+      - name: Attest the SBOM
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: app/build/outputs/apk/release/*.apk
+          sbom-path: ${{ env.SBOM_PATH }}
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -64,5 +151,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          files: app/build/outputs/apk/release/*.apk
+          files: |
+            app/build/outputs/apk/release/*.apk
+            sbom/*.cdx.json
           generate_release_notes: true
