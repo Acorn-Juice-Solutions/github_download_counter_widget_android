@@ -5,13 +5,12 @@ import android.content.ComponentName
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.acornjuice.downloadwidget.R
 import com.acornjuice.downloadwidget.appContainer
 import com.acornjuice.downloadwidget.data.repo.ReleaseRepository
 import com.acornjuice.downloadwidget.domain.model.RefreshResult
 import com.acornjuice.downloadwidget.domain.time.TimeProvider
 import com.acornjuice.downloadwidget.ui.widget.WidgetKind
-import com.acornjuice.downloadwidget.ui.widget.WidgetRenderer
+import com.acornjuice.downloadwidget.ui.widget.WidgetPublisher
 import com.acornjuice.downloadwidget.ui.widget.toWidgetState
 import com.acornjuice.downloadwidget.util.SafeLogger
 import kotlinx.coroutines.Dispatchers
@@ -89,20 +88,12 @@ class RefreshWorker(
             val cached = repository.cachedRelease(widgetId)
             val state = result.toWidgetState(cached)
             SafeLogger.i(TAG, "Rendering widget=$widgetId cached=${cached != null} state=${state::class.simpleName}")
-            val views = WidgetRenderer.render(
-                context = applicationContext,
-                layoutId = kind.layoutRes,
-                widgetId = widgetId,
-                state = state,
-                providerClass = kind.providerClass,
-            )
             // Push RemoteViews from the main thread. Some AppWidgetHost implementations
             // silently drop updates originating from background threads when the previous
             // update (from an onReceive on the main thread) is still pending, leaving the
             // widget stuck in the earlier state (e.g. Loading).
             withContext(Dispatchers.Main) {
-                appWidgetManager.updateAppWidget(widgetId, views)
-                appWidgetManager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_asset_list)
+                WidgetPublisher.publish(applicationContext, appWidgetManager, kind, widgetId, state)
             }
             SafeLogger.i(TAG, "updateAppWidget sent widget=$widgetId")
         }

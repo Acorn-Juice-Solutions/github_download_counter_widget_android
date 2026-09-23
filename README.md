@@ -17,10 +17,14 @@ everything else we ship: layered architecture, unit-tested data layer, CI with S
 (ktlint) + Detekt + JUnit + Robolectric, supply-chain checks on every push, signed
 release workflow, Material 3 + Dynamic Colors, English + Spanish.
 
-> Verified on Pixel Launcher / Android 15+. Other AppWidgetHost implementations may
-> coalesce or drop consecutive `updateAppWidget` calls differently — see the
-> [`docs/architecture.md`](docs/architecture.md#tap-refresh-path-101) tap-refresh
-> section for the workaround that this app deploys and the rationale behind it.
+> Verified on Pixel Launcher / Android 15+. The asset list is shipped inside the
+> `RemoteViews` (`RemoteCollectionItems`, API 31+) rather than through a
+> `RemoteViewsService`: a remote adapter made the host apply the tree asynchronously and,
+> on these launchers, silently keep the previous view — which froze the counter while the
+> list kept updating. See
+> [`docs/architecture.md`](docs/architecture.md#why-the-asset-list-is-inlined-and-the-bug-that-forced-it)
+> for the full diagnosis; it cost three rounds of wrong fixes and is worth reading before
+> touching the render path.
 
 ## Screenshots
 
@@ -47,7 +51,7 @@ Demo video: [`docs/GitHubWidget.mov`](docs/GitHubWidget.mov)
 
 ## Quickstart
 
-Requires JDK 17 + Android SDK 34.
+Requires JDK 17 + Android SDK 36.
 
 ```bash
 # Clone
@@ -81,19 +85,22 @@ See [`docs/architecture.md`](docs/architecture.md) for a diagram and per-package
 The short version:
 
 ```
-Widget (AppWidgetProvider)  ─┐
-      │ onReceive(ACTION_REFRESH)
-      ▼
-RefreshScheduler ── enqueues ──▶ RefreshWorker (CoroutineWorker)
-                                        │
-                                        ▼
-                          ReleaseRepository
-                          │        │        │        │        │
-                          ▼        ▼        ▼        ▼        ▼
-                       GitHubApi  Config  Cache  ETag  SecureToken
-                          │
-                          ▼
-                    api.github.com
+widget tap ──ACTION_REFRESH──▶ BaseDownloadWidgetProvider
+                                 │ arms RefreshWatchdogWorker, then fetches (8 s cap)
+                                 │
+onUpdate / hourly ──▶ RefreshScheduler ──▶ RefreshWorker (CoroutineWorker)
+                                 │                    │
+                                 └─────────┬──────────┘
+                                           ▼
+                                   ReleaseRepository
+                                   │       │      │      │        │
+                                   ▼       ▼      ▼      ▼        ▼
+                               GitHubApi Config Cache  ETag  SecureToken
+                                   │
+                                   ▼
+                             api.github.com
+
+every render ──▶ WidgetPublisher ──▶ AppWidgetManager.updateAppWidget
 ```
 
 - **`domain/`** owns the vocabulary (`Asset`, `Release`, `RefreshResult`). Zero Android APIs.
@@ -103,10 +110,13 @@ RefreshScheduler ── enqueues ──▶ RefreshWorker (CoroutineWorker)
   Storage-agnostic on purpose so tests inject plain prefs.
 - **`data/repo/ReleaseRepository`** is the single choke point translating transport-level
   outcomes into UI-facing `RefreshResult`s.
-- **`ui/widget/`** is a thin `AppWidgetProvider` + a pure `WidgetRenderer` + a
-  `RemoteViewsService` for the asset list.
-- **`worker/`** owns WorkManager plumbing. No reflection — provider dispatch is via the
-  `WidgetKind` enum.
+- **`ui/widget/`** is a thin `AppWidgetProvider`, a pure `WidgetRenderer` and a single
+  `WidgetPublisher` choke point for every push to the launcher. The asset rows ride inside
+  the `RemoteViews`; `AssetListRemoteViewsService` survives only as the pre-API-31
+  fallback.
+- **`worker/`** owns WorkManager plumbing: the refresh worker plus the watchdog that
+  guarantees the widget can never be stranded on the loading spinner. No reflection —
+  provider dispatch is via the `WidgetKind` enum.
 - **`di/AppContainer`** wires the graph. Manual DI, lazy, ~40 lines.
 
 ## Testing
@@ -116,7 +126,7 @@ RefreshScheduler ── enqueues ──▶ RefreshWorker (CoroutineWorker)
 ./gradlew connectedAndroidTest        # Instrumented (requires emulator/device)
 ```
 
-99 unit tests covering the data + domain + rendering layers. Coverage enforcement via
+117 unit tests covering the data + domain + rendering layers. Coverage enforcement via
 Kover is checked in but currently disabled — Kover 0.9 does not yet auto-detect the
 AGP 9 debug variant, so its report is consistently empty. `koverVerify` is therefore
 not part of the quality gate above, and CI does not run it. Both will be re-enabled

@@ -124,6 +124,23 @@ class WidgetRendererTest {
         assertThat(label).contains("·")
     }
 
+    // --- Rows and total in lockstep ---------------------------------------------------
+    //
+    // How the rows are derived lives in AssetListBinderTest; what this asserts is the
+    // invariant that used to break: a rendered widget always ships a count matching the
+    // rows it carries.
+
+    @Test
+    fun `rendered total always equals the sum of the rows it ships with`() {
+        val release = Release("v1.2.3", listOf(Asset("a.apk", 40), Asset("b.aab", 2)), 1_726_000_000L)
+        val state = WidgetState.Success(release)
+
+        val root = render(state)
+
+        val rowsTotal = AssetListBinder.assetsFor(state).sumOf { it.downloadCount }
+        assertThat(textOf(root, R.id.widget_count)).isEqualTo(rowsTotal.toString())
+    }
+
     /** Placeholder AppWidgetProvider class only used to feed a concrete `Class<*>` to the renderer. */
     private class FakeProvider : android.appwidget.AppWidgetProvider()
 }

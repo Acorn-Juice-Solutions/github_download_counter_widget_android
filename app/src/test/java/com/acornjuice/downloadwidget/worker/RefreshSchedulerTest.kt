@@ -3,6 +3,7 @@ package com.acornjuice.downloadwidget.worker
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
+import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
@@ -80,5 +81,51 @@ class RefreshSchedulerTest {
             "${RefreshScheduler.WORK_NAME_ONESHOT_PREFIX}_DownloadWidgetProvider",
         ).get()
         assertThat(infos).hasSize(1)
+    }
+
+    @Test
+    fun `enqueueWatchdog creates work under a widget-scoped name`() {
+        scheduler.enqueueWatchdog(
+            widgetId = 144,
+            providerClassName = PROVIDER,
+            refreshStartedAtEpochMillis = 1_726_000_000_123L,
+            delaySeconds = 15,
+        )
+
+        val infos = workManager.getWorkInfosForUniqueWork(RefreshScheduler.watchdogWorkName(144)).get()
+        assertThat(infos).hasSize(1)
+    }
+
+    @Test
+    fun `watchdogs for different widgets do not replace each other`() {
+        scheduler.enqueueWatchdog(widgetId = 1, providerClassName = PROVIDER, refreshStartedAtEpochMillis = 1L, delaySeconds = 15)
+        scheduler.enqueueWatchdog(widgetId = 2, providerClassName = PROVIDER, refreshStartedAtEpochMillis = 2L, delaySeconds = 15)
+
+        assertThat(workManager.getWorkInfosForUniqueWork(RefreshScheduler.watchdogWorkName(1)).get()).hasSize(1)
+        assertThat(workManager.getWorkInfosForUniqueWork(RefreshScheduler.watchdogWorkName(2)).get()).hasSize(1)
+    }
+
+    @Test
+    fun `watchdog carries no network constraint`() {
+        // The stuck-spinner case it rescues is most likely precisely when the network is
+        // down, so requiring connectivity here would disable the safety net when it matters.
+        scheduler.enqueueWatchdog(widgetId = 144, providerClassName = PROVIDER, refreshStartedAtEpochMillis = 1L, delaySeconds = 15)
+
+        val info = workManager.getWorkInfosForUniqueWork(RefreshScheduler.watchdogWorkName(144)).get().single()
+        assertThat(info.constraints.requiredNetworkType).isEqualTo(NetworkType.NOT_REQUIRED)
+    }
+
+    @Test
+    fun `cancelWatchdog stands the safety net down`() {
+        scheduler.enqueueWatchdog(widgetId = 144, providerClassName = PROVIDER, refreshStartedAtEpochMillis = 1L, delaySeconds = 15)
+
+        scheduler.cancelWatchdog(144)
+
+        val info = workManager.getWorkInfosForUniqueWork(RefreshScheduler.watchdogWorkName(144)).get().single()
+        assertThat(info.state).isEqualTo(WorkInfo.State.CANCELLED)
+    }
+
+    private companion object {
+        const val PROVIDER = "com.acornjuice.downloadwidget.ui.widget.DownloadWidgetProvider"
     }
 }

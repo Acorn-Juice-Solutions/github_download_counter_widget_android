@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
-import com.acornjuice.downloadwidget.R
 import com.acornjuice.downloadwidget.appContainer
 import com.acornjuice.downloadwidget.domain.model.Asset
 
@@ -13,6 +12,11 @@ import com.acornjuice.downloadwidget.domain.model.Asset
  * Serves per-row [RemoteViews] for the widget's asset list. Reads assets from the
  * shared [com.acornjuice.downloadwidget.data.local.AssetCacheStore] so this class does
  * no JSON parsing or preference access of its own.
+ *
+ * **Only used below API 31.** From Android 12 the rows are carried inline by
+ * [AssetListBinder] via `RemoteViews.RemoteCollectionItems`; binding a service-backed
+ * adapter there stopped the host from applying the rest of the widget. See
+ * [WidgetRenderer]'s kdoc for the full story.
  */
 class AssetListRemoteViewsService : RemoteViewsService() {
 
@@ -46,13 +50,8 @@ private class AssetListFactory(
 
     override fun getCount(): Int = assets.size
 
-    override fun getViewAt(position: Int): RemoteViews {
-        val asset = assets[position]
-        return RemoteViews(packageName, R.layout.widget_list_item).apply {
-            setTextViewText(R.id.widget_asset_name, asset.name)
-            setTextViewText(R.id.widget_asset_count, asset.downloadCount.toString())
-        }
-    }
+    override fun getViewAt(position: Int): RemoteViews =
+        AssetListBinder.assetRow(packageName, assets[position])
 
     override fun getLoadingView(): RemoteViews? = null
 

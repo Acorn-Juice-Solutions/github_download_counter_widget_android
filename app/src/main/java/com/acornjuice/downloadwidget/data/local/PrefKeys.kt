@@ -24,6 +24,9 @@ object PrefKeys {
     const val KEY_ETAG_URL = "pref_etag_url"
     const val KEY_ETAG_TAG = "pref_etag_tag"
 
+    /** Epoch-millis stamp of an in-flight tap refresh; backs [RefreshStateStore]. */
+    const val KEY_REFRESH_STARTED_AT = "pref_refresh_started_at"
+
     /* Secure-store keys (single, not widget-scoped — see design §6.1). */
     const val KEY_TOKEN = "pref_github_token"
 

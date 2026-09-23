@@ -29,10 +29,6 @@
     <string name="widget_settings">Settings</string>
     <string name="widget_refresh">Refresh</string>
 
-    <!-- Tap-time toast confirmations -->
-    <string name="widget_refresh_toast_updated">Widget refreshed</string>
-    <string name="widget_refresh_toast_error">Could not refresh widget</string>
-
     <!-- Settings screen -->
     <string name="settings_category_source">Source configuration</string>
     <string name="settings_category_advanced">Advanced (optional)</string>

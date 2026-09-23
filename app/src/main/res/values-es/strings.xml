@@ -29,10 +29,6 @@
     <string name="widget_settings">Ajustes</string>
     <string name="widget_refresh">Actualizar</string>
 
-    <!-- Tap-time toast confirmations -->
-    <string name="widget_refresh_toast_updated">Widget actualizado</string>
-    <string name="widget_refresh_toast_error">No se pudo actualizar</string>
-
     <!-- Settings screen -->
     <string name="settings_category_source">Configuración del origen</string>
     <string name="settings_category_advanced">Avanzado (opcional)</string>

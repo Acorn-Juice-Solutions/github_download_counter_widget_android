@@ -2,7 +2,10 @@ package com.acornjuice.downloadwidget.data.remote
 
 import com.acornjuice.downloadwidget.domain.time.TimeProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -13,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import java.util.concurrent.TimeUnit
+import kotlin.system.measureTimeMillis
 
 @RunWith(JUnit4::class)
 class OkHttpGitHubApiTest {
@@ -186,5 +190,44 @@ class OkHttpGitHubApiTest {
 
         val recorded = server.takeRequest()
         assertThat(recorded.path).isEqualTo("/repos/owner/name/releases/tags/v2.0.0-beta.1")
+    }
+
+    @Test
+    fun `cancelling the caller aborts the in-flight call instead of waiting out OkHttp`() {
+        // Regression guard for the widget's stuck-spinner bug. `Call.execute()` is blocking
+        // and coroutine cancellation is cooperative, so a `withTimeout` around a refresh used
+        // to be decorative: it only took effect once OkHttp's own timeouts released the
+        // thread. On a stalled network that turned an 8 s budget into a ~30 s frozen spinner.
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        val stallingClient = OkHttpClient.Builder()
+            .connectTimeout(OKHTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(OKHTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(OKHTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+        val stallingApi = OkHttpGitHubApi(client = stallingClient, time = fixedTime)
+
+        var timedOut = false
+        // Real time on purpose: the whole point is how long the call takes to unwind, which a
+        // virtual-time test scheduler would paper over.
+        val elapsedMillis = measureTimeMillis {
+            runBlocking {
+                try {
+                    withTimeout(CALLER_BUDGET_MILLIS) {
+                        stallingApi.fetchRelease(baseUrl(), tag = "v1.0.0", token = null, etag = null)
+                    }
+                } catch (expected: TimeoutCancellationException) {
+                    timedOut = true
+                }
+            }
+        }
+
+        assertThat(timedOut).isTrue()
+        assertThat(elapsedMillis).isLessThan(TimeUnit.SECONDS.toMillis(OKHTTP_TIMEOUT_SECONDS))
+    }
+
+    private companion object {
+        /** Far longer than the caller's budget, so an unbounded call is unmistakable. */
+        const val OKHTTP_TIMEOUT_SECONDS = 30L
+        const val CALLER_BUDGET_MILLIS = 500L
     }
 }

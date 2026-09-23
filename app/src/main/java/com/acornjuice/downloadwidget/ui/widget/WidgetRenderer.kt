@@ -1,8 +1,6 @@
 package com.acornjuice.downloadwidget.ui.widget
 
-import android.appwidget.AppWidgetManager
 import android.content.Context
-import android.content.Intent
 import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.LayoutRes
@@ -22,6 +20,28 @@ import java.util.Locale
  * The two widget layouts (`R.layout.widget_layout` and `R.layout.widget_layout_small`)
  * share the same set of view ids; the small layout marks unused views as `gone`, so all
  * `setViewVisibility` / `setTextViewText` calls below are safe against both.
+ *
+ * The asset list is not built here: [AssetListBinder] owns it, including which of the two
+ * collection mechanisms the running OS version allows.
+ *
+ * ### Why the asset list is inlined (API 31+)
+ *
+ * This is the fix for the widget's longest-running bug. The list used to be backed by
+ * [AssetListRemoteViewsService] via the legacy `setRemoteAdapter(viewId, Intent)`, re-wired
+ * on every render. A `RemoteViews` carrying a remote adapter forces the host to bind that
+ * service and apply the tree asynchronously — and on the target launchers that apply never
+ * replaced the live view. The host kept the previous view tree, whose adapter was still
+ * alive and still answered `notifyAppWidgetViewDataChanged`. The result was the symptom that
+ * defeated three earlier rounds of fixes: **the asset list kept updating while the count,
+ * the badge and the spinner stayed frozen on whatever rendered first**, which made it look
+ * like a redraw/coalescing problem rather than an apply failure.
+ *
+ * [RemoteViews.RemoteCollectionItems] (API 31+) carries the rows inside the `RemoteViews`
+ * itself: no service, no binding, no async apply, and no `notifyAppWidgetViewDataChanged`.
+ * The whole widget lands as one unit, so the list can no longer disagree with the rest of
+ * the widget — the rows are derived from the very same [WidgetState].
+ *
+ * Below API 31 the service-backed adapter remains the only option, so that path is kept.
  */
 object WidgetRenderer {
 
@@ -35,7 +55,7 @@ object WidgetRenderer {
         val views = RemoteViews(context.packageName, layoutId)
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
         wireActions(context, views, widgetId, providerClass)
-        wireAssetList(context, views, widgetId)
+        AssetListBinder.bind(context, views, widgetId, state)
         applyState(context, views, state)
         return views
     }
@@ -51,15 +71,6 @@ object WidgetRenderer {
         views.setOnClickPendingIntent(R.id.widget_refresh_container, refreshPending)
         views.setOnClickPendingIntent(R.id.widget_refresh, refreshPending)
         views.setOnClickPendingIntent(R.id.widget_settings, settingsPending)
-    }
-
-    private fun wireAssetList(context: Context, views: RemoteViews, widgetId: Int) {
-        val listIntent = Intent(context, AssetListRemoteViewsService::class.java).apply {
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-            data = android.net.Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
-        }
-        views.setRemoteAdapter(R.id.widget_asset_list, listIntent)
-        views.setEmptyView(R.id.widget_asset_list, R.id.widget_empty)
     }
 
     private fun applyState(context: Context, views: RemoteViews, state: WidgetState) {
@@ -143,8 +154,6 @@ object WidgetRenderer {
         views.setViewVisibility(R.id.widget_refresh, if (visible) View.GONE else View.VISIBLE)
     }
 
-    // Includes seconds so a user tapping refresh can visually confirm the tick even when
-    // the API returned 304 NotModified (identical count + badge; only the timestamp moves).
     // Seconds included so the user can visually confirm each refresh tick even when the
     // API returns 304 NotModified (identical count + badge; only the timestamp moves).
     private const val TIME_PATTERN = "HH:mm:ss"
