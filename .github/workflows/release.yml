@@ -98,7 +98,7 @@ jobs:
       - name: Locate the SBOM
         run: |
           set -euo pipefail
-          file=$(find sbom -type f -name '*.cdx.json' | head -n 1)
+          file=$(find sbom -type f -name '*.cdx.json' -print -quit)
           if [ -z "$file" ]; then
             echo "::error::No .cdx.json inside the downloaded SBOM artifact."
             exit 1
@@ -122,6 +122,37 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
+
+      # AGP 9 removed applicationVariants, and its replacement only exposes
+      # outputFileName through an internal VariantOutputImpl — not something to
+      # lean on, given how much of this build already bends around AGP 9. The
+      # tag is the better source anyway: it is what identifies the release, and
+      # checking it against versionName here is what stops another release from
+      # shipping as 1.0.1.
+      - name: Name the APK after the tag
+        run: |
+          set -euo pipefail
+          expected="${GITHUB_REF_NAME#v}"
+          declared=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
+          if [ "$declared" != "$expected" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} but versionName is \"$declared\". Bump app/build.gradle.kts before tagging."
+            exit 1
+          fi
+
+          apk=$(find app/build/outputs/apk/release -type f -name '*.apk' -print -quit)
+          if [ -z "$apk" ]; then
+            echo "::error::assembleRelease produced no APK."
+            exit 1
+          fi
+
+          target="app/build/outputs/apk/release/download-widget-${GITHUB_REF_NAME}.apk"
+          mv "$apk" "$target"
+          # v4 signing writes an .idsig beside the APK; incremental install only
+          # finds it while the two names still match.
+          if [ -f "$apk.idsig" ]; then
+            mv "$apk.idsig" "$target.idsig"
+          fi
+          echo "APK published as \`$(basename "$target")\`." >> "$GITHUB_STEP_SUMMARY"
 
       # Both of these are actions/ — the same trust level as the checkout and
       # upload steps this job already runs. That is why they belong here and
