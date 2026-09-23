@@ -4,12 +4,17 @@ import com.acornjuice.downloadwidget.domain.time.SystemTimeProvider
 import com.acornjuice.downloadwidget.domain.time.TimeProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONException
 import java.io.IOException
+import kotlin.coroutines.resume
 
 /**
  * Default [GitHubApi] implementation backed by OkHttp.
@@ -17,6 +22,10 @@ import java.io.IOException
  * Uses the `GET /repos/{owner}/{repo}/releases/tags/{tag}` endpoint directly so that stale
  * releases (older than the default page size of `/releases`) are still resolvable.
  * All HTTP outcomes are mapped to typed [ApiResponse] variants — this method never throws.
+ *
+ * The in-flight [okhttp3.Call] is aborted when the calling coroutine is cancelled, which is
+ * what allows callers to put a real upper bound on a refresh with `withTimeout`. See
+ * [fetchRelease] for why that is not automatic.
  */
 class OkHttpGitHubApi(
     private val client: OkHttpClient,
@@ -44,20 +53,62 @@ class OkHttpGitHubApi(
             }
             .build()
 
-        try {
-            client.newCall(request).execute().use { response ->
-                when (response.code) {
-                    HTTP_OK -> handleOk(response)
-                    HTTP_NOT_MODIFIED -> ApiResponse.NotModified
-                    HTTP_NOT_FOUND -> ApiResponse.NotFound
-                    HTTP_FORBIDDEN -> handleForbidden(response)
-                    else -> ApiResponse.HttpError(response.code)
-                }
+        client.newCall(request).awaitMapped { response ->
+            when (response.code) {
+                HTTP_OK -> handleOk(response)
+                HTTP_NOT_MODIFIED -> ApiResponse.NotModified
+                HTTP_NOT_FOUND -> ApiResponse.NotFound
+                HTTP_FORBIDDEN -> handleForbidden(response)
+                else -> ApiResponse.HttpError(response.code)
             }
-        } catch (io: IOException) {
-            ApiResponse.Network(io)
         }
     }
+
+    /**
+     * Runs the call and maps its [Response] with [map], aborting the request outright if the
+     * calling coroutine is cancelled.
+     *
+     * This is what gives callers a real timeout. The obvious `Call.execute()` is blocking and
+     * never polls `isActive`, and coroutine cancellation is cooperative — so a `withTimeout`
+     * around it was decorative: it fired on schedule but could not return until OkHttp's own
+     * timeouts released the thread, up to CALL_TIMEOUT_SECONDS later. That is what left the
+     * widget's spinner turning for ~30 s on a stalled network.
+     *
+     * A job completion handler is *not* enough either: a cancelled job whose body is still
+     * blocked stays in the "cancelling" state and does not complete, so the handler would only
+     * run once the very call it is meant to abort had already finished.
+     * [suspendCancellableCoroutine] fires [kotlinx.coroutines.CancellableContinuation.invokeOnCancellation]
+     * the moment cancellation arrives, which is the whole point.
+     *
+     * [map] runs on OkHttp's dispatcher thread while the continuation is still suspended, so
+     * the (also blocking) response-body read is covered by the same cancellation hook.
+     */
+    private suspend fun Call.awaitMapped(map: (Response) -> ApiResponse): ApiResponse =
+        suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { cancel() }
+            enqueue(
+                object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        if (continuation.isActive) continuation.resume(ApiResponse.Network(e))
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        // `use` closes the response on every path, including the one where the
+                        // continuation is already cancelled and the value is dropped — without
+                        // it a cancelled refresh would leak the connection.
+                        val mapped = try {
+                            response.use(map)
+                        } catch (io: IOException) {
+                            ApiResponse.Network(io)
+                        } catch (malformed: RuntimeException) {
+                            // A parser blowing up must not crash OkHttp's dispatcher thread.
+                            ApiResponse.Malformed(malformed)
+                        }
+                        if (continuation.isActive) continuation.resume(mapped)
+                    }
+                },
+            )
+        }
 
     private fun handleOk(response: okhttp3.Response): ApiResponse {
         val body = response.body?.string()

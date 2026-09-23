@@ -84,6 +84,7 @@ If you need the SBOM for a release and the artifact has expired, ask by email.
 | Per-widget API URL, tag | Plain `SharedPreferences` | Non-sensitive by design |
 | Cached asset list + `fetched_at` | Plain `SharedPreferences` | Public data |
 | ETag per widget | Plain `SharedPreferences` | Opaque token, no security value |
+| "Refresh in flight since" stamp per widget | Plain `SharedPreferences` | A timestamp; lets the watchdog spot a refresh the OS killed mid-flight |
 
 `android:allowBackup="false"` and explicit `data_extraction_rules.xml` /
 `backup_rules.xml` files prevent both cloud backup and device-to-device transfer of these

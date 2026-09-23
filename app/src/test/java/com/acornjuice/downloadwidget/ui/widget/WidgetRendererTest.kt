@@ -124,6 +124,58 @@ class WidgetRendererTest {
         assertThat(label).contains("·")
     }
 
+    // --- Asset rows -------------------------------------------------------------------
+    //
+    // Regression guards for the bug where the widget showed a fresh asset list next to a
+    // stale total. The rows used to be pulled from the cache by a separate
+    // RemoteViewsService on its own schedule; they now come from the same WidgetState as
+    // everything else, so the two cannot disagree.
+
+    @Test
+    fun `assetsFor Success uses the fetched release`() {
+        val release = Release("v1.2.3", listOf(Asset("a.apk", 40), Asset("b.aab", 2)), 1_726_000_000L)
+
+        assertThat(WidgetRenderer.assetsFor(WidgetState.Success(release))).isEqualTo(release.assets)
+    }
+
+    @Test
+    fun `assetsFor Loading and Error fall back to the cached release`() {
+        val cached = Release("v1.0.0", listOf(Asset("a.apk", 12)), 1_000L)
+
+        assertThat(WidgetRenderer.assetsFor(WidgetState.Loading(cached))).isEqualTo(cached.assets)
+        assertThat(WidgetRenderer.assetsFor(WidgetState.Error(WidgetState.ErrorKind.NETWORK, cached)))
+            .isEqualTo(cached.assets)
+    }
+
+    @Test
+    fun `assetsFor yields no rows when there is nothing to show`() {
+        assertThat(WidgetRenderer.assetsFor(WidgetState.Loading(cached = null))).isEmpty()
+        assertThat(WidgetRenderer.assetsFor(WidgetState.Error(WidgetState.ErrorKind.NETWORK, cached = null)))
+            .isEmpty()
+        assertThat(WidgetRenderer.assetsFor(WidgetState.UnconfiguredEmpty)).isEmpty()
+    }
+
+    @Test
+    fun `rendered total always equals the sum of the rows it ships with`() {
+        val release = Release("v1.2.3", listOf(Asset("a.apk", 40), Asset("b.aab", 2)), 1_726_000_000L)
+        val state = WidgetState.Success(release)
+
+        val root = render(state)
+
+        val rowsTotal = WidgetRenderer.assetsFor(state).sumOf { it.downloadCount }
+        assertThat(textOf(root, R.id.widget_count)).isEqualTo(rowsTotal.toString())
+    }
+
+    @Test
+    fun `assetRow renders the asset name and its download count`() {
+        val row = WidgetRenderer.assetRow(context.packageName, Asset("AccuVideoPro.msi", 147))
+            .apply(context, null as ViewGroup?)
+
+        assertThat(textOf(row, R.id.widget_asset_name)).isEqualTo("AccuVideoPro.msi")
+        assertThat(textOf(row, R.id.widget_asset_count)).isEqualTo("147")
+    }
+
     /** Placeholder AppWidgetProvider class only used to feed a concrete `Class<*>` to the renderer. */
     private class FakeProvider : android.appwidget.AppWidgetProvider()
 }
+

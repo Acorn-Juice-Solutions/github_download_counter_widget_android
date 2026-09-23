@@ -6,13 +6,13 @@ treated seriously.
 ## Environment
 
 - JDK 17 (Temurin recommended)
-- Android SDK 34
+- Android SDK 36
 - Android Studio Ladybug (2024.2) or newer
 
 Clone and run:
 
 ```bash
-git clone https://github.com/Neonexus29/github_download_counter_widget_android.git
+git clone https://github.com/Acorn-Juice-Solutions/github_download_counter_widget_android.git
 cd github_download_counter_widget_android
 ./gradlew help
 ```
@@ -27,7 +27,7 @@ cd github_download_counter_widget_android
   most findings automatically.
 - **Detekt** runs on `src/main` and `src/test` with the config at
   `config/detekt/detekt.yml`.
-- **`testDebugUnitTest`** runs the JVM + Robolectric suite (89 tests as of 1.0.0).
+- **`testDebugUnitTest`** runs the JVM + Robolectric suite (117 tests).
 - Coverage reporting via Kover is temporarily disabled — see the plugin comment in
   `app/build.gradle.kts`. It will come back on when Kover ships AGP 9 support.
 

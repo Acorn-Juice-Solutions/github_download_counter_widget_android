@@ -6,6 +6,63 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Third attempt at the tap-refresh stuck spinner, this time against the actual root cause.
+The 1.0.1 fix below treated it as a launcher redraw problem; it was a refresh with no
+enforced upper bound, on a flow that could only be completed by a process the OS was free
+to kill.
+
+### Fixed
+
+- Tapping refresh could leave the widget spinning on a yellow `UPDATING` badge for ~30 s,
+  or indefinitely. `withTimeout(8s)` was decorative: it wrapped a blocking
+  `Call.execute()`, and coroutine cancellation is cooperative, so the timeout fired on
+  schedule but could not return until OkHttp's *own* timeouts released the thread — up to
+  `callTimeout` (30 s) later. Measured on-device: a tap on a stalled network logged
+  "timed out after 8s" **15.04 s** after the tap, and rendered at 18.06 s. `OkHttpGitHubApi`
+  now bridges through `suspendCancellableCoroutine` and aborts the `Call` from
+  `invokeOnCancellation`, which is what makes a caller's timeout real. (A job completion
+  handler is *not* sufficient: a cancelled job whose body is still blocked stays in the
+  "cancelling" state and never completes, so the handler would only run once the call it
+  was meant to abort had already finished.)
+- A failed refresh reported success. The follow-up render discarded the `RefreshResult`
+  and re-read the cache, so a timed-out or errored refresh painted a green `UPDATED` badge
+  over stale data. The terminal render is now derived from the actual result.
+- `onUpdate` ran `runBlocking { repository.refresh() }` on the receiver's main thread,
+  blocking the UI thread for the full duration of the HTTP call — an ANR on exactly the
+  slow networks the widget has to cope with. It now paints from cache and delegates the
+  fetch to `RefreshScheduler.enqueueOneShot`, which was already implemented but
+  unreferenced since the 1.0.0 refactor.
+
+### Added
+
+- `RefreshWatchdogWorker` + `RefreshStateStore`, enforcing the invariant that **a
+  `Loading` render is never issued without a scheduled way out of it**. The in-flight stamp
+  is persisted (with `commit()`, not `apply()` — the scenario it exists to survive is the
+  one where the process never flushes) and a watchdog is armed in WorkManager, which
+  outlives the process. The stamp doubles as a fencing token, so a watchdog that fires late
+  cannot clobber a newer, healthy refresh. The watchdog deliberately carries no network
+  constraint: the failure it rescues is likeliest precisely when the network is down.
+- `WidgetPublisher`, a single choke point for pushing state to the launcher, so the
+  "render, then notify the collection" pair cannot drift apart across the four call sites.
+- 16 unit tests, including an on-the-clock regression guard that fails if a cancelled
+  refresh waits out OkHttp's timeouts instead of aborting (30.4 s → 1.02 s). Total: 96 → 112.
+
+### Changed
+
+- Tap refresh no longer splits itself across two receiver invocations with a delayed
+  self-broadcast. The terminal render is published from the same coroutine on the main
+  thread, held to a 2 s minimum spinner dwell — enough to clear the launcher's coalescing
+  window and to show the user that something happened, down from ~3.5 s at best.
+- Refresh feedback is now carried solely by the status badge. The toasts added in 1.0.1
+  were suppressed outright on devices where the user has denied the app notifications
+  (confirmed on-device: `Suppressing toast from package ... by user request`), which left a
+  failed refresh with no visible signal at all.
+
+### Removed
+
+- `WidgetActions.ACTION_APPLY_FOLLOWUP` and the delayed self-rebroadcast it drove.
+- `widget_refresh_toast_updated` / `widget_refresh_toast_error` strings.
+
 ## [1.0.1] – 2026-09-20
 
 Bugfix release for widget refresh, config persistence, and animation quirks discovered

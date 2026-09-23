@@ -102,10 +102,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
     /**
      * Kicks each affected widget through its refresh-tap pipeline so the network fetch
      * *and* the visual repaint happen. We reuse [WidgetActions.ACTION_REFRESH]
-     * deliberately: firing plain `ACTION_APPWIDGET_UPDATE` routes to `onUpdate` which
-     * uses `updateAppWidget` — silently dropped by this app's target launchers. The
-     * tap-refresh flow ends in `partiallyUpdateAppWidget` (different launcher code
-     * path), which actually repaints the widget.
+     * deliberately: firing plain `ACTION_APPWIDGET_UPDATE` routes to `onUpdate`, which
+     * only repaints from cache and delegates the fetch to WorkManager — so a settings
+     * change would not be reflected until that worker happened to land. The tap-refresh
+     * flow fetches immediately, spaces its two renders far enough apart to clear the
+     * launcher's coalescing window, and arms the stuck-spinner watchdog.
      *
      * Two paths:
      * - Opened from a specific widget's settings icon → only that widget refreshes.

@@ -6,6 +6,7 @@ import androidx.work.WorkManager
 import com.acornjuice.downloadwidget.data.local.AssetCacheStore
 import com.acornjuice.downloadwidget.data.local.ETagStore
 import com.acornjuice.downloadwidget.data.local.PrefKeys
+import com.acornjuice.downloadwidget.data.local.RefreshStateStore
 import com.acornjuice.downloadwidget.data.local.SecureTokenStore
 import com.acornjuice.downloadwidget.data.local.SecureTokenStoreFactory
 import com.acornjuice.downloadwidget.data.local.WidgetConfigStore
@@ -44,6 +45,8 @@ class AppContainer(context: Context) {
     val assetCacheStore: AssetCacheStore by lazy { AssetCacheStore(plainPrefs) }
 
     val etagStore: ETagStore by lazy { ETagStore(plainPrefs) }
+
+    val refreshStateStore: RefreshStateStore by lazy { RefreshStateStore(plainPrefs) }
 
     val secureTokenStore: SecureTokenStore by lazy { SecureTokenStoreFactory.create(appContext) }
 
