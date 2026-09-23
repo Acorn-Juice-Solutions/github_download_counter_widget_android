@@ -5,8 +5,8 @@ on:
     tags:
       - "v*"
 
-# Read-only by default, as in ci.yml: the SBOM job has no business writing to
-# the repository, and a job added later cannot silently inherit write.
+# Read-only by default, as in ci.yml: only the job that publishes the release
+# widens this, and a job added later cannot silently inherit write.
 permissions:
   contents: read
 
@@ -15,9 +15,9 @@ jobs:
     name: CycloneDX SBOM
     runs-on: ubuntu-latest
     # Deliberately a separate job from the signed build. sbom-action is
-    # third-party code, and the publishing job holds the decoded release
-    # keystore — keeping them apart means nothing third-party ever shares a
-    # workspace, a runner or a secret scope with the signing key.
+    # third-party code, and the build job holds the decoded release keystore —
+    # keeping them apart means nothing third-party ever shares a workspace, a
+    # runner or a secret scope with the signing key.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,24 +49,29 @@ jobs:
           echo "### SBOM" >> "$GITHUB_STEP_SUMMARY"
           echo "\`$count\` components catalogued for \`${GITHUB_REF_NAME}\`." >> "$GITHUB_STEP_SUMMARY"
 
-  build-and-publish:
-    name: Assemble signed release + upload to GitHub Release
+  build:
+    name: Assemble signed release + attest
     runs-on: ubuntu-latest
     # Fail closed: no SBOM, no release. A tag that cannot produce an inventory
     # is a tag whose contents we cannot describe.
     needs: sbom
     permissions:
-      contents: write
-      # attest-build-provenance signs through Sigstore using this job's OIDC
-      # identity and writes the attestation to the repository's store.
+      # No contents: write. This job decodes the keystore, so it gets the
+      # narrowest token that still lets it do its work — publishing happens
+      # in a separate job that never sees the key.
+      contents: read
+      # attest-* sign through Sigstore using this job's OIDC identity and write
+      # the attestations to the repository's store. Both actions are actions/ —
+      # the same trust level as checkout and upload-artifact. Provenance has to
+      # be signed by the job that actually produced the binary, which is why
+      # these stay here rather than moving to the publish job.
       id-token: write
       attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Nothing here pushes back to the repo (the release is published with
-          # the action's own token), so the checkout credential is dead weight
-          # in a job that also holds the signing keystore.
+          # Nothing here pushes back to the repo, so the checkout credential is
+          # dead weight in a job that also holds the signing keystore.
           persist-credentials: false
 
       - name: Set up JDK 17
@@ -86,7 +91,7 @@ jobs:
           cache-disabled: true
 
       # Before the keystore exists on disk, and in its own directory so the
-      # release glob below cannot pick up anything else the job wrote.
+      # artifact glob below cannot pick up anything else the job wrote.
       - name: Download the SBOM
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -154,10 +159,6 @@ jobs:
           fi
           echo "APK published as \`$(basename "$target")\`." >> "$GITHUB_STEP_SUMMARY"
 
-      # Both of these are actions/ — the same trust level as the checkout and
-      # upload steps this job already runs. That is why they belong here and
-      # the third-party generator stays out in its own job: provenance has to
-      # be signed by the run that actually produced the binary.
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -172,6 +173,9 @@ jobs:
           subject-path: app/build/outputs/apk/release/*.apk
           sbom-path: ${{ env.SBOM_PATH }}
 
+      # Handing the APK to the publish job through an artifact is what lets the
+      # two stay apart: the publisher gets the signed binary without ever being
+      # on the runner where the key was.
       - name: Upload APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -179,10 +183,34 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    # The only job in this workflow that is allowed to write to the repository,
+    # and the only one that runs a third-party action with a token. It never
+    # checks out the tree, never decodes the keystore, and holds no OIDC or
+    # attestation capability — so a compromised publisher can forge neither
+    # provenance nor a signature, only a release it already had rights to.
+    permissions:
+      contents: write
+    steps:
+      - name: Download the APK
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: download-widget-release-apk
+          path: dist
+
+      - name: Download the SBOM
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: download-widget-${{ github.ref_name }}.cdx.json
+          path: dist
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
-            app/build/outputs/apk/release/*.apk
-            sbom/*.cdx.json
+            dist/*.apk
+            dist/*.cdx.json
           generate_release_notes: true
