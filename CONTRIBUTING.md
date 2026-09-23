@@ -75,10 +75,26 @@ Then:
 # 2. Move [Unreleased] entries to [X.Y.Z] – <today> in CHANGELOG.md
 git commit -am "release: X.Y.Z"
 git tag vX.Y.Z
-git push origin main --tags
+git push origin main
+git push origin vX.Y.Z
 ```
 
-The `Release` workflow will build a signed APK and attach it to the GitHub Release.
+The tag goes up on its own rather than with `--tags`, which would fire every local tag
+that is not yet upstream.
+
+The `Release` workflow then, in order:
+
+1. Generates a CycloneDX SBOM from the tagged tree, in a job of its own. The generator is
+   third-party code and the job below holds the decoded signing keystore, so the two never
+   share a workspace, a runner or a secret scope.
+2. Refuses to continue if the tag does not match `versionName` — `v2.0.2` requires
+   `versionName = "2.0.2"`. Prerelease tags such as `v2.0.2-rc1` are rejected by this
+   check as it stands.
+3. Builds and signs the APK, publishes it as `download-widget-vX.Y.Z.apk` with the SBOM
+   attached, and attests both the build and the SBOM through Sigstore.
+
+Everything that can fail does so before anything is published, so a failed release leaves
+no release rather than half of one: delete the tag, fix, tag again.
 
 ## Reporting a bug
 

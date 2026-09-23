@@ -67,7 +67,15 @@ lockfile against the declared dependencies, scans the full history for secrets, 
 checks that every GitHub Action stays pinned to a commit SHA. Reports are kept as build
 artifacts for 90 days.
 
-If you need the SBOM for a release and the artifact has expired, ask by email.
+That 90-day window does not apply to releases. Every tagged release carries its own
+CycloneDX SBOM as an asset, plus a build-provenance attestation and an SBOM attestation
+signed through Sigstore. Both are bound to the APK's digest, so a swapped binary or an
+edited inventory stops verifying:
+
+```bash
+gh attestation verify download-widget-vX.Y.Z.apk \
+  --repo Acorn-Juice-Solutions/github_download_counter_widget_android
+```
 
 ## Supported versions
 

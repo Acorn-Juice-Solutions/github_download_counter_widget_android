@@ -149,6 +149,21 @@ when Kover ships AGP 9 support.
 
 Scan reports are kept as build artifacts for 90 days.
 
+Tagged releases do not depend on that retention window. `release.yml` builds each release
+its own inventory, from the tagged tree rather than from whatever `main` looked like when
+the nightly scan last ran, and publishes:
+
+- **`download-widget-vX.Y.Z.cdx.json`** – the CycloneDX SBOM, attached to the release
+  next to the APK.
+- **A build-provenance attestation and an SBOM attestation**, both signed through
+  Sigstore. They bind the build and the inventory to the APK's digest, which is what
+  turns "here is our SBOM" from a claim into something you can check:
+
+```bash
+gh attestation verify download-widget-vX.Y.Z.apk \
+  --repo Acorn-Juice-Solutions/github_download_counter_widget_android
+```
+
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
