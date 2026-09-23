@@ -6,57 +6,73 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Third attempt at the tap-refresh stuck spinner, this time against the actual root cause.
-The 1.0.1 fix below treated it as a launcher redraw problem; it was a refresh with no
-enforced upper bound, on a flow that could only be completed by a process the OS was free
-to kill.
+Third attempt at the tap-refresh stuck spinner. The two previous ones treated it as a
+launcher redraw problem; it was the asset list. Along the way the refresh path picked up a
+real timeout, an honest status badge and a safety net it never had.
 
 ### Fixed
 
-- Tapping refresh could leave the widget spinning on a yellow `UPDATING` badge for ~30 s,
-  or indefinitely. `withTimeout(8s)` was decorative: it wrapped a blocking
-  `Call.execute()`, and coroutine cancellation is cooperative, so the timeout fired on
-  schedule but could not return until OkHttp's *own* timeouts released the thread — up to
-  `callTimeout` (30 s) later. Measured on-device: a tap on a stalled network logged
-  "timed out after 8s" **15.04 s** after the tap, and rendered at 18.06 s. `OkHttpGitHubApi`
-  now bridges through `suspendCancellableCoroutine` and aborts the `Call` from
-  `invokeOnCancellation`, which is what makes a caller's timeout real. (A job completion
-  handler is *not* sufficient: a cancelled job whose body is still blocked stays in the
-  "cancelling" state and never completes, so the handler would only run once the call it
-  was meant to abort had already finished.)
-- A failed refresh reported success. The follow-up render discarded the `RefreshResult`
-  and re-read the cache, so a timed-out or errored refresh painted a green `UPDATED` badge
-  over stale data. The terminal render is now derived from the actual result.
+- **Tapping refresh left the widget frozen** — spinner turning, yellow `UPDATING` badge,
+  counter stuck on whatever had rendered first — while the asset list below it kept
+  showing fresh numbers. That split is what misdirected two earlier fixes: a widget with a
+  current list next to a stale total reads as a repaint bug. It was an apply failure. The
+  list was backed by `AssetListRemoteViewsService` through the legacy
+  `setRemoteAdapter(viewId, Intent)`, re-wired on every render; a `RemoteViews` carrying a
+  remote adapter makes the host bind that service and apply the tree asynchronously, and on
+  the target launchers that apply silently kept the previous view — whose adapter was still
+  alive and still answered `notifyAppWidgetViewDataChanged`. From API 31 the rows now ride
+  inside the `RemoteViews` via `RemoteViews.RemoteCollectionItems`: no service, no binding,
+  no async apply, no notify. The widget lands as one unit. The pre-API-31 service-backed
+  path is kept, and is the only place the notify call survives.
+- Rows are now derived from the same `WidgetState` as the counter
+  (`WidgetRenderer.assetsFor`), so the list and the total can no longer disagree — the
+  exact camouflage that hid this bug for three releases is now structurally impossible.
+- `withTimeout(8s)` around a refresh was decorative. It wrapped a blocking `Call.execute()`
+  and coroutine cancellation is cooperative, so the timeout fired on schedule but could not
+  return until OkHttp's *own* timeouts released the thread — measured on-device at 15.04 s
+  for an 8 s budget, with a ceiling of `callTimeout` (30 s). `OkHttpGitHubApi` now bridges
+  through `suspendCancellableCoroutine` and aborts the `Call` from `invokeOnCancellation`.
+  (A job completion handler is not enough: a cancelled job whose body is still blocked stays
+  in the "cancelling" state and never completes, so the handler would only run once the call
+  it was meant to abort had already finished.)
+- A failed refresh reported success. The follow-up render discarded the `RefreshResult` and
+  re-read the cache, so a timed-out or errored refresh painted a green `UPDATED` badge over
+  stale data. The terminal render now comes from the actual result.
 - `onUpdate` ran `runBlocking { repository.refresh() }` on the receiver's main thread,
-  blocking the UI thread for the full duration of the HTTP call — an ANR on exactly the
-  slow networks the widget has to cope with. It now paints from cache and delegates the
-  fetch to `RefreshScheduler.enqueueOneShot`, which was already implemented but
-  unreferenced since the 1.0.0 refactor.
+  blocking it for the duration of the HTTP call — an ANR waiting for a slow network. It now
+  paints from cache and hands the fetch to `RefreshScheduler.enqueueOneShot`, which had been
+  implemented but unreferenced since the 1.0.0 refactor.
 
 ### Added
 
-- `RefreshWatchdogWorker` + `RefreshStateStore`, enforcing the invariant that **a
-  `Loading` render is never issued without a scheduled way out of it**. The in-flight stamp
-  is persisted (with `commit()`, not `apply()` — the scenario it exists to survive is the
-  one where the process never flushes) and a watchdog is armed in WorkManager, which
-  outlives the process. The stamp doubles as a fencing token, so a watchdog that fires late
-  cannot clobber a newer, healthy refresh. The watchdog deliberately carries no network
-  constraint: the failure it rescues is likeliest precisely when the network is down.
+- `RefreshWatchdogWorker` + `RefreshStateStore`, enforcing the invariant that **a `Loading`
+  render is never issued without a scheduled way out of it**. The in-flight stamp is
+  persisted (with `commit()`, not `apply()` — the scenario it exists to survive is the one
+  where the process never flushes) and a watchdog is armed in WorkManager, which outlives
+  the process. The stamp doubles as a fencing token, so a watchdog firing late cannot
+  clobber a newer, healthy refresh. It deliberately carries no network constraint: the
+  failure it rescues is likeliest precisely when the network is down.
 - `WidgetPublisher`, a single choke point for pushing state to the launcher, so the
-  "render, then notify the collection" pair cannot drift apart across the four call sites.
-- 16 unit tests, including an on-the-clock regression guard that fails if a cancelled
-  refresh waits out OkHttp's timeouts instead of aborting (30.4 s → 1.02 s). Total: 96 → 112.
+  render-and-notify pair cannot drift apart across its four call sites.
+- 21 unit tests, including an on-the-clock regression guard that fails if a cancelled
+  refresh waits out OkHttp's timeouts instead of aborting (30.4 s → 1.02 s), and coverage of
+  the state-to-rows mapping. Total: 96 → 117.
+- `gradle.properties`, absent until now, so the daemon no longer runs on Gradle's default
+  384 MB of metaspace: `:app:lintVitalAnalyzeRelease` was dying with
+  `OutOfMemoryError: Metaspace` on every `assembleRelease`.
 
 ### Changed
 
 - Tap refresh no longer splits itself across two receiver invocations with a delayed
   self-broadcast. The terminal render is published from the same coroutine on the main
-  thread, held to a 2 s minimum spinner dwell — enough to clear the launcher's coalescing
-  window and to show the user that something happened, down from ~3.5 s at best.
-- Refresh feedback is now carried solely by the status badge. The toasts added in 1.0.1
-  were suppressed outright on devices where the user has denied the app notifications
-  (confirmed on-device: `Suppressing toast from package ... by user request`), which left a
-  failed refresh with no visible signal at all.
+  thread, held to a 2 s minimum spinner dwell so the user sees the refresh happen — down
+  from ~3.5 s at best, and from up to 33 s on a stalled network.
+- Refresh feedback is carried solely by the status badge. The toasts added in 1.0.1 were
+  suppressed outright wherever the user has denied the app notifications (confirmed
+  on-device: `Suppressing toast from package ... by user request`), which left a failed
+  refresh with no visible signal at all.
+- `docs/architecture.md` rewritten around the real diagnosis, replacing the tap-refresh
+  section that documented the two fixes that did not work.
 
 ### Removed
 
