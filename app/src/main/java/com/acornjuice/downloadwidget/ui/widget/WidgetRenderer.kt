@@ -1,16 +1,11 @@
 package com.acornjuice.downloadwidget.ui.widget
 
-import android.appwidget.AppWidgetManager
 import android.content.Context
-import android.content.Intent
-import android.os.Build
 import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.LayoutRes
-import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import com.acornjuice.downloadwidget.R
-import com.acornjuice.downloadwidget.domain.model.Asset
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,6 +20,9 @@ import java.util.Locale
  * The two widget layouts (`R.layout.widget_layout` and `R.layout.widget_layout_small`)
  * share the same set of view ids; the small layout marks unused views as `gone`, so all
  * `setViewVisibility` / `setTextViewText` calls below are safe against both.
+ *
+ * The asset list is not built here: [AssetListBinder] owns it, including which of the two
+ * collection mechanisms the running OS version allows.
  *
  * ### Why the asset list is inlined (API 31+)
  *
@@ -47,14 +45,6 @@ import java.util.Locale
  */
 object WidgetRenderer {
 
-    /**
-     * Whether the legacy [AssetListRemoteViewsService] adapter is in use, which is the only
-     * case where the collection needs an explicit `notifyAppWidgetViewDataChanged`.
-     * Consumed by [WidgetPublisher].
-     */
-    val usesServiceBackedCollection: Boolean
-        get() = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
-
     fun render(
         context: Context,
         @LayoutRes layoutId: Int,
@@ -65,34 +55,10 @@ object WidgetRenderer {
         val views = RemoteViews(context.packageName, layoutId)
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title))
         wireActions(context, views, widgetId, providerClass)
-        wireAssetList(context, views, widgetId, assetsFor(state))
+        AssetListBinder.bind(context, views, widgetId, state)
         applyState(context, views, state)
         return views
     }
-
-    /**
-     * The rows [state] implies.
-     *
-     * Deriving them from the [WidgetState] rather than re-reading the cache is what keeps the
-     * list and the counter in lockstep. The old service-backed factory read the cache on its
-     * own schedule, which is how the widget could show a fresh asset list next to a stale
-     * total — the symptom that made this bug so hard to read.
-     */
-    internal fun assetsFor(state: WidgetState): List<Asset> = when (state) {
-        is WidgetState.Success -> state.release.assets
-        is WidgetState.Loading -> state.cached?.assets.orEmpty()
-        is WidgetState.Error -> state.cached?.assets.orEmpty()
-        WidgetState.UnconfiguredEmpty -> emptyList()
-    }
-
-    /**
-     * A single asset row. Shared by both collection paths so they cannot drift apart.
-     */
-    internal fun assetRow(packageName: String, asset: Asset): RemoteViews =
-        RemoteViews(packageName, R.layout.widget_list_item).apply {
-            setTextViewText(R.id.widget_asset_name, asset.name)
-            setTextViewText(R.id.widget_asset_count, asset.downloadCount.toString())
-        }
 
     private fun wireActions(
         context: Context,
@@ -105,46 +71,6 @@ object WidgetRenderer {
         views.setOnClickPendingIntent(R.id.widget_refresh_container, refreshPending)
         views.setOnClickPendingIntent(R.id.widget_refresh, refreshPending)
         views.setOnClickPendingIntent(R.id.widget_settings, settingsPending)
-    }
-
-    private fun wireAssetList(
-        context: Context,
-        views: RemoteViews,
-        widgetId: Int,
-        assets: List<Asset>,
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            views.setRemoteAdapter(R.id.widget_asset_list, inlineAssetItems(context, assets))
-        } else {
-            wireServiceBackedAssetList(context, views, widgetId)
-        }
-        views.setEmptyView(R.id.widget_asset_list, R.id.widget_empty)
-    }
-
-    /**
-     * Rows travelling inside the [RemoteViews]. Size is bounded by a GitHub release's asset
-     * count (single digits in practice), comfortably inside the Binder transaction budget.
-     */
-    @RequiresApi(Build.VERSION_CODES.S)
-    private fun inlineAssetItems(context: Context, assets: List<Asset>): RemoteViews.RemoteCollectionItems =
-        RemoteViews.RemoteCollectionItems.Builder()
-            .setHasStableIds(true)
-            .setViewTypeCount(ASSET_VIEW_TYPE_COUNT)
-            .apply {
-                assets.forEachIndexed { index, asset ->
-                    addItem(index.toLong(), assetRow(context.packageName, asset))
-                }
-            }
-            .build()
-
-    /** Pre-API-31 fallback: the only way to populate a collection before inline items existed. */
-    @Suppress("DEPRECATION")
-    private fun wireServiceBackedAssetList(context: Context, views: RemoteViews, widgetId: Int) {
-        val listIntent = Intent(context, AssetListRemoteViewsService::class.java).apply {
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-            data = android.net.Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
-        }
-        views.setRemoteAdapter(R.id.widget_asset_list, listIntent)
     }
 
     private fun applyState(context: Context, views: RemoteViews, state: WidgetState) {
@@ -232,7 +158,4 @@ object WidgetRenderer {
     // API returns 304 NotModified (identical count + badge; only the timestamp moves).
     private const val TIME_PATTERN = "HH:mm:ss"
     private const val MILLIS_PER_SECOND = 1_000L
-
-    /** Every asset row uses the same layout. */
-    private const val ASSET_VIEW_TYPE_COUNT = 1
 }

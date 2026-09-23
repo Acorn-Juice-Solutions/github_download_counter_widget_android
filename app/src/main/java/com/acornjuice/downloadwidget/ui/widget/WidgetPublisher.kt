@@ -42,7 +42,7 @@ object WidgetPublisher {
         // Only the pre-API-31 service-backed adapter needs this: from API 31 the rows ride
         // inside the RemoteViews above, so they are already current. Issuing it anyway was
         // part of what kept the host on a stale view tree — see WidgetRenderer's kdoc.
-        if (WidgetRenderer.usesServiceBackedCollection) {
+        if (AssetListBinder.usesServiceBackedCollection) {
             appWidgetManager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_asset_list)
         }
     }

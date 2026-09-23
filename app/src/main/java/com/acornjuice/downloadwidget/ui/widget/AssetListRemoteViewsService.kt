@@ -14,7 +14,7 @@ import com.acornjuice.downloadwidget.domain.model.Asset
  * no JSON parsing or preference access of its own.
  *
  * **Only used below API 31.** From Android 12 the rows are carried inline by
- * [WidgetRenderer] via `RemoteViews.RemoteCollectionItems`; binding a service-backed
+ * [AssetListBinder] via `RemoteViews.RemoteCollectionItems`; binding a service-backed
  * adapter there stopped the host from applying the rest of the widget. See
  * [WidgetRenderer]'s kdoc for the full story.
  */
@@ -51,7 +51,7 @@ private class AssetListFactory(
     override fun getCount(): Int = assets.size
 
     override fun getViewAt(position: Int): RemoteViews =
-        WidgetRenderer.assetRow(packageName, assets[position])
+        AssetListBinder.assetRow(packageName, assets[position])
 
     override fun getLoadingView(): RemoteViews? = null
 
