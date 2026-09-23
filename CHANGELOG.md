@@ -6,6 +6,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.2] – 2026-09-23
+
 Third attempt at the tap-refresh stuck spinner. The two previous ones treated it as a
 launcher redraw problem; it was the asset list. Along the way the refresh path picked up a
 real timeout, an honest status badge and a safety net it never had.
