@@ -178,4 +178,3 @@ class WidgetRendererTest {
     /** Placeholder AppWidgetProvider class only used to feed a concrete `Class<*>` to the renderer. */
     private class FakeProvider : android.appwidget.AppWidgetProvider()
 }
-
