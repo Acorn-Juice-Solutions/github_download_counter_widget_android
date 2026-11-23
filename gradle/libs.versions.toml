@@ -12,14 +12,14 @@ androidx-security-crypto = "1.1.0-alpha06"
 material = "1.12.0"
 
 # Third-party runtime
-okhttp = "4.12.0"
+okhttp = "5.5.0"
 coroutines = "1.9.0"
 
 # Test
 junit = "4.13.2"
 json = "20240303"
-truth = "1.4.4"
-robolectric = "4.13"
+truth = "1.4.5"
+robolectric = "4.16.1"
 androidx-test-core = "1.6.1"
 androidx-test-runner = "1.6.2"
 androidx-test-ext-junit = "1.2.1"
